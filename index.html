@@ -53,6 +53,13 @@
         </div>
       </div>
       <div class="setting">
+        <span class="setting-label">音</span>
+        <div class="choices" id="choice-sound">
+          <button class="choice" data-key="voice" role="switch">詠み上げ<small>音声合成</small></button>
+          <button class="choice" data-key="se" role="switch">効果音<small>打鍵・ミス</small></button>
+        </div>
+      </div>
+      <div class="setting">
         <span class="setting-label">難易度</span>
         <div class="choices" id="choice-level" role="radiogroup" aria-label="難易度">
           <button class="choice" data-value="easy" role="radio">初級<small>かな＋ローマ字</small></button>
@@ -62,6 +69,7 @@
       </div>
     </div>
 
+    <p id="voice-notice" class="voice-notice" hidden></p>
     <button id="btn-start" class="primary">はじめる<kbd>Enter</kbd></button>
     <p id="best-record" class="best"></p>
     <p class="note">上の句が出たあと、少し置いてから下の句が表示されます（<code>Space</code> ですぐ表示）。<br>日本語入力は<strong>オフ（直接入力）</strong>にしてください。<br>「し」は <code>shi</code> / <code>si</code>、「ん」は <code>n</code> / <code>nn</code> など複数のローマ字入力に対応しています。</p>
@@ -85,7 +93,7 @@
       <hr class="rule">
       <div class="shimo-area">
         <p class="reading invisible" id="reading">
-          <span class="reading-label">詠み上げ中<span class="dots"><i></i><i></i><i></i></span></span>
+          <span class="reading-label" id="reading-label">詠み上げ中<span class="dots"><i></i><i></i><i></i></span></span>
           <span class="reading-bar"><i id="reading-fill"></i></span>
           <span class="reading-note">覚えていれば先に打てます／<kbd>Space</kbd>ですぐ表示</span>
         </p>
@@ -97,6 +105,7 @@
 
     <p class="hint-bar">
       <button id="btn-quit" class="ghost">やめる<kbd>Esc</kbd></button>
+      <button id="btn-mute" class="ghost" aria-pressed="false">音を止める</button>
       <span class="ime-warn" id="ime-warn" hidden>日本語入力がオンになっていませんか？</span>
     </p>
     <input id="capture" class="capture" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-hidden="true" tabindex="-1">

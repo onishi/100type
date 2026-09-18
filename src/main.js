@@ -1,11 +1,12 @@
 import { POEMS } from "./data/poems.js";
 import { TypingTarget } from "./romaji.js";
+import * as audio from "./audio.js";
 
 const $ = (id) => document.getElementById(id);
 const SETTINGS_KEY = "100type.settings";
 const BEST_KEY = "100type.best";
 
-const DEFAULTS = { count: 10, order: "random", level: "easy", wait: 2000 };
+const DEFAULTS = { count: 10, order: "random", level: "easy", wait: 2000, voice: true, se: true };
 const RANKS = [
   [300, "歌聖"],
   [220, "歌仙"],
@@ -36,6 +37,9 @@ const el = {
   progressFill: $("progress-fill"),
   imeWarn: $("ime-warn"),
   reading: $("reading"),
+  readingLabel: $("reading-label"),
+  voiceNotice: $("voice-notice"),
+  mute: $("btn-mute"),
   readingFill: $("reading-fill"),
   capture: $("capture"),
   bestRecord: $("best-record"),
@@ -49,6 +53,7 @@ const settings = loadSettings();
 let game = null;
 let tick = null;
 let revealTimer = null;
+let safetyTimer = null;
 
 /* ── 設定 ─────────────────────────────────── */
 function loadSettings() {
@@ -86,6 +91,42 @@ function bindChoices(containerId, key, onChange) {
     onChange?.();
   });
   paint();
+}
+
+function bindToggles(containerId) {
+  const container = $(containerId);
+  const paint = () => {
+    for (const btn of container.querySelectorAll(".choice")) {
+      btn.setAttribute("aria-checked", String(Boolean(settings[btn.dataset.key])));
+    }
+  };
+  container.addEventListener("click", (e) => {
+    const btn = e.target.closest(".choice");
+    if (!btn) return;
+    settings[btn.dataset.key] = !settings[btn.dataset.key];
+    saveSettings();
+    paint();
+    audio.unlock();
+    if (settings[btn.dataset.key] && btn.dataset.key === "se") audio.sfx.key();
+    updateVoiceNotice();
+    updateMuteButton();
+  });
+  paint();
+}
+
+/** 日本語の音声が見つからないブラウザではその旨を伝える */
+function updateVoiceNotice() {
+  const missing = settings.voice && !audio.speechAvailable();
+  el.voiceNotice.hidden = !missing;
+  el.voiceNotice.textContent = missing
+    ? "このブラウザでは日本語の音声が見つかりません。詠み上げは鳴りませんが、そのまま遊べます。"
+    : "";
+}
+
+function updateMuteButton() {
+  const on = settings.voice || settings.se;
+  el.mute.textContent = on ? "音を止める" : "音を出す";
+  el.mute.setAttribute("aria-pressed", String(!on));
 }
 
 /* ── 記録 ─────────────────────────────────── */
@@ -141,6 +182,7 @@ function pickPoems() {
 }
 
 function startGame() {
+  audio.unlock();
   game = {
     poems: pickPoems(),
     index: 0,
@@ -153,6 +195,8 @@ function startGame() {
     poemStartedAt: 0,
     poemMiss: 0,
     phase: "reading",
+    waitDone: false,
+    speechDone: true,
     finished: false,
   };
   el.imeWarn.hidden = true;
@@ -180,6 +224,8 @@ function loadPoem() {
   game.poemMiss = 0;
   // 上の句だけを見せる「詠み上げ」の間。打ち始めは待たずにできる。
   game.phase = settings.wait > 0 ? "reading" : "typing";
+  game.waitDone = settings.wait <= 0;
+  game.speechDone = true;
 
   el.poemNo.textContent = `第${poem.n}番`;
   el.author.textContent = poem.author;
@@ -192,11 +238,21 @@ function loadPoem() {
   renderTarget();
 }
 
-/** 下の句を伏せたまま、待ち時間のあいだ詠み上げ表示を出す */
+/** 下の句を伏せたまま、上の句を読み上げつつ待ち時間を表示する */
 function startReading() {
   clearTimeout(revealTimer);
+  clearTimeout(safetyTimer);
+  audio.stopSpeaking();
+
+  const poem = game.poems[game.index];
+  const speaking = settings.voice && audio.speak(poem.kamiSpeech, onSpeechEnd);
+  game.speechDone = !speaking;
+  game.waitDone = settings.wait <= 0;
+  el.readingLabel.firstChild.textContent = speaking ? "詠み上げ中" : "まもなく下の句";
+
   if (game.phase !== "reading") {
     el.reading.classList.add("invisible");
+    // 「詠み待ちなし」でも読み上げは最後まで流す
     return;
   }
   el.reading.classList.remove("invisible");
@@ -206,11 +262,27 @@ function startReading() {
   void fill.offsetWidth; // リフローさせてからアニメーションを開始する
   fill.style.transition = `width ${settings.wait}ms linear`;
   fill.style.width = "100%";
-  revealTimer = setTimeout(reveal, settings.wait);
+  revealTimer = setTimeout(() => {
+    game.waitDone = true;
+    maybeReveal();
+  }, settings.wait);
+  // 読み上げ終了イベントが来ない場合でも必ず表示する
+  safetyTimer = setTimeout(reveal, settings.wait + 15000);
+}
+
+function onSpeechEnd() {
+  if (!game) return;
+  game.speechDone = true;
+  maybeReveal();
+}
+
+function maybeReveal() {
+  if (game && game.waitDone && game.speechDone) reveal();
 }
 
 function reveal() {
   clearTimeout(revealTimer);
+  clearTimeout(safetyTimer);
   if (!game || game.phase !== "reading") return;
   game.phase = "typing";
   el.reading.classList.add("invisible");
@@ -294,7 +366,9 @@ function handleKey(ch) {
   const ok = game.target.input(ch);
   if (ok) {
     game.keys++;
+    if (settings.se) audio.sfx.key();
   } else {
+    if (settings.se) audio.sfx.miss();
     game.miss++;
     game.poemMiss++;
     el.card.classList.remove("miss");
@@ -314,6 +388,7 @@ function completePoem() {
     miss: game.poemMiss,
   });
   el.card.classList.add("clear");
+  if (settings.se) audio.sfx.clear();
   game.index++;
   if (game.index >= game.poems.length) {
     finishGame();
@@ -351,7 +426,10 @@ function updateHud() {
 
 function finishGame() {
   game.finished = true;
+  audio.stopSpeaking();
+  if (settings.se) audio.sfx.finish();
   clearTimeout(revealTimer);
+  clearTimeout(safetyTimer);
   el.reading.hidden = true;
   game.endedAt = performance.now();
   clearInterval(tick);
@@ -396,6 +474,8 @@ function finishGame() {
 function quitGame() {
   clearInterval(tick);
   clearTimeout(revealTimer);
+  clearTimeout(safetyTimer);
+  audio.stopSpeaking();
   game = null;
   show("start");
   renderBest();
@@ -449,9 +529,28 @@ el.screens.play.addEventListener("click", focusCapture);
 bindChoices("choice-count", "count", renderBest);
 bindChoices("choice-order", "order", renderBest);
 bindChoices("choice-wait", "wait", renderBest);
+bindToggles("choice-sound");
 bindChoices("choice-level", "level", renderBest);
 $("btn-start").addEventListener("click", startGame);
 $("btn-again").addEventListener("click", startGame);
 $("btn-home").addEventListener("click", quitGame);
 $("btn-quit").addEventListener("click", quitGame);
+$("btn-mute").addEventListener("click", () => {
+  const on = settings.voice || settings.se;
+  settings.voice = settings.se = !on;
+  if (!settings.voice) audio.stopSpeaking();
+  saveSettings();
+  updateMuteButton();
+  updateVoiceNotice();
+  for (const btn of $("choice-sound").querySelectorAll(".choice")) {
+    btn.setAttribute("aria-checked", String(Boolean(settings[btn.dataset.key])));
+  }
+  focusCapture();
+});
 renderBest();
+updateVoiceNotice();
+updateMuteButton();
+// 音声一覧は非同期に読み込まれることがある
+if (typeof speechSynthesis !== "undefined") {
+  speechSynthesis.addEventListener?.("voiceschanged", updateVoiceNotice);
+}

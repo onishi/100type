@@ -201,6 +201,13 @@ kbd {
 
 .best { text-align: center; color: var(--gold); margin: 14px 0 0; font-size: 0.95rem; min-height: 1.7em; }
 
+.voice-notice {
+  text-align: center;
+  color: var(--crimson);
+  font-size: 0.83rem;
+  margin: 14px 0 0;
+}
+
 .note {
   text-align: center;
   color: var(--ink-faint);
@@ -359,13 +366,14 @@ kbd {
 .hint-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
+  justify-content: flex-start;
   gap: 10px;
   margin: 0;
   flex-wrap: wrap;
 }
 
-.ime-warn { color: var(--crimson); font-size: 0.88rem; }
+.ime-warn { color: var(--crimson); font-size: 0.88rem; margin-inline-start: auto; }
 
 .capture {
   position: fixed;
