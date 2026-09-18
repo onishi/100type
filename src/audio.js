@@ -69,8 +69,8 @@ if (synth) {
   synth.addEventListener?.("voiceschanged", loadVoices);
 }
 
-// 声の好み。詠み上げに向く、落ち着いた日本語音声を先に選ぶ。
-const VOICE_PREFERENCE = ["Google 日本語", "Kyoko", "O-Ren", "Otoya", "Nanami", "Ayumi", "Haruka", "Hattori", "Ichiro"];
+// 詠み手は Kyoko。入っていない環境では、ある日本語音声で代用する。
+const VOICE_NAME = "Kyoko";
 
 /** 使える日本語の音声を一覧で返す */
 export function japaneseVoices() {
@@ -79,19 +79,15 @@ export function japaneseVoices() {
   return voices.filter((v) => (v.lang || "").toLowerCase().startsWith("ja"));
 }
 
-/** 日本語の音声があれば返す（name を指定すればその声を優先） */
-export function japaneseVoice(name) {
+/** 詠み手の声を返す（Kyoko があればそれ、なければ手近な日本語音声） */
+export function japaneseVoice() {
   const ja = japaneseVoices();
   if (!ja.length) return null;
-  if (name) {
-    const chosen = ja.find((v) => v.name === name);
-    if (chosen) return chosen;
-  }
-  for (const key of VOICE_PREFERENCE) {
-    const hit = ja.find((v) => (v.name || "").includes(key));
-    if (hit) return hit;
-  }
-  return ja.find((v) => v.localService) || ja[0];
+  return (
+    ja.find((v) => (v.name || "").includes(VOICE_NAME)) ||
+    ja.find((v) => v.localService) ||
+    ja[0]
+  );
 }
 
 export function speechAvailable() {
@@ -99,9 +95,12 @@ export function speechAvailable() {
 }
 
 const PHRASE_GAP_MS = 420; // 句のあいだに置く間
+const VERSE_GAP_MS = 700; // 上の句と下の句のあいだに置く間
 export const DEFAULT_RATE = 0.8;
 const FINAL_PHRASE_RATE = 0.9; // 結びの句は少しゆっくり読む
 let speechSeq = 0;
+let chainActive = false; // いま読み上げの途中かどうか
+let queued = null; // 読み終わったあとに続けて読むもの
 
 /** onend が来ないブラウザでも止まらないよう、読み終わりの見込み時間を出す */
 function estimateMs(text, rate) {
@@ -110,12 +109,27 @@ function estimateMs(text, rate) {
 
 /**
  * 歌を句ごとに区切って読み上げる。読み上げを始められたら true。
+ * queue を立てると、いま読んでいる途中なら、それを読み終えてから続けて読む
+ * （上の句に続けて下の句を詠むのに使う）。
  * @param {string} text 空白で句に区切った読み
  * @param {{ onPhrase?: (index: number) => void, onEnd?: () => void,
- *           rate?: number, voiceName?: string }} options
+ *           rate?: number, queue?: boolean }} options
  */
-export function speak(text, { onPhrase, onEnd, rate = DEFAULT_RATE, voiceName } = {}) {
-  const voice = japaneseVoice(voiceName);
+export function speak(text, options = {}) {
+  if (!synth || !japaneseVoice()) return false;
+  if (options.queue && chainActive) {
+    queued = { text, options };
+    return true;
+  }
+  return startChain(text, options, 120);
+}
+
+/**
+ * 実際に読み始める。
+ * @param {number} delay 読み始めるまでの待ち（cancel() 直後は少し置く必要がある）
+ */
+function startChain(text, { onPhrase, onEnd, rate = DEFAULT_RATE } = {}, delay = 120) {
+  const voice = japaneseVoice();
   if (!synth || !voice) return false;
   const phrases = String(text).split(/[\s、]+/).filter(Boolean);
   if (!phrases.length) return false;
@@ -128,12 +142,20 @@ export function speak(text, { onPhrase, onEnd, rate = DEFAULT_RATE, voiceName } 
   } catch {
     return false;
   }
+  chainActive = true;
 
   const speakPhrase = (i) => {
     if (!alive()) return;
     if (i >= phrases.length) {
+      chainActive = false;
       onPhrase?.(-1);
       onEnd?.();
+      // 続けて読むものがあれば、少し間を置いてから読む
+      if (queued && alive()) {
+        const next = queued;
+        queued = null;
+        startChain(next.text, next.options, VERSE_GAP_MS);
+      }
       return;
     }
     onPhrase?.(i);
@@ -166,12 +188,14 @@ export function speak(text, { onPhrase, onEnd, rate = DEFAULT_RATE, voiceName } 
   };
 
   // cancel() の直後に speak() すると鳴らないブラウザがあるので、少し置いてから始める
-  setTimeout(() => speakPhrase(0), 120);
+  setTimeout(() => speakPhrase(0), delay);
   return true;
 }
 
 export function stopSpeaking() {
   speechSeq++; // 途中の句が続かないようにする
+  chainActive = false;
+  queued = null;
   try {
     synth?.cancel();
   } catch {
