@@ -1,0 +1,12 @@
+{
+  "name": "100type",
+  "version": "1.0.0",
+  "private": true,
+  "description": "百人一首タイピング — 上の句が出たら下の句を打つタイピングゲーム",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/romaji.test.mjs",
+    "start": "npx --yes http-server -p 8123 -c-1 ."
+  },
+  "license": "MIT"
+}

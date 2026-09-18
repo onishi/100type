@@ -1,0 +1,390 @@
+:root {
+  --ink: #1b2336;
+  --ink-soft: #55607a;
+  --ink-faint: #9aa2b4;
+  --washi: #f6f1e6;
+  --washi-deep: #ece3d2;
+  --crimson: #9b2d30;
+  --indigo: #27406e;
+  --gold: #b48a3c;
+  --line: rgba(27, 35, 54, 0.14);
+  --shadow: 0 18px 44px -28px rgba(27, 35, 54, 0.55);
+  --on-accent: #f7f2e8;
+  --serif: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #eee7da;
+    --ink-soft: #b7b0a2;
+    --ink-faint: #6f6a60;
+    --washi: #14161d;
+    --washi-deep: #1b1e27;
+    --crimson: #e2777a;
+    --indigo: #93b2e8;
+    --gold: #d8b166;
+    --on-accent: #1a1119;
+    --line: rgba(238, 231, 218, 0.16);
+    --shadow: 0 18px 44px -26px rgba(0, 0, 0, 0.9);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--washi);
+  color: var(--ink);
+  font-family: var(--serif);
+  line-height: 1.7;
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 和紙のような淡い地紋 */
+.paper {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 620px at 12% -10%, color-mix(in srgb, var(--indigo) 12%, transparent), transparent 70%),
+    radial-gradient(900px 520px at 110% 10%, color-mix(in srgb, var(--crimson) 10%, transparent), transparent 68%),
+    repeating-linear-gradient(115deg, transparent 0 7px, color-mix(in srgb, var(--ink) 3%, transparent) 7px 8px);
+}
+
+#app {
+  width: min(880px, 100%);
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 56px) 16px 32px;
+  flex: 1;
+}
+
+.screen { animation: rise 0.35s ease both; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ── タイトル ─────────────────────────────── */
+.title-block { text-align: center; margin-bottom: clamp(20px, 4vw, 36px); }
+
+.kicker {
+  margin: 0;
+  letter-spacing: 0.5em;
+  text-indent: 0.5em;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.title {
+  margin: 0.15em 0 0;
+  font-size: clamp(2.3rem, 8vw, 3.6rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.title-sub {
+  display: block;
+  font-size: 0.34em;
+  letter-spacing: 0.45em;
+  text-indent: 0.45em;
+  color: var(--crimson);
+  font-weight: 600;
+  margin-top: 0.6em;
+}
+
+.lead { margin: 1em 0 0; color: var(--ink-soft); }
+
+/* ── 設定 ─────────────────────────────────── */
+.settings {
+  display: grid;
+  gap: 14px;
+  background: color-mix(in srgb, var(--washi-deep) 70%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: clamp(14px, 3vw, 22px);
+  box-shadow: var(--shadow);
+}
+
+.setting { display: grid; grid-template-columns: 5.5em 1fr; align-items: center; gap: 10px; }
+
+.setting-label { font-size: 0.9rem; color: var(--ink-soft); letter-spacing: 0.15em; }
+
+.choices { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.choice {
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+}
+
+.choice small { font-size: 0.72em; color: var(--ink-faint); }
+
+.choice:hover { border-color: color-mix(in srgb, var(--indigo) 55%, var(--line)); }
+
+.choice[aria-checked="true"] {
+  background: var(--indigo);
+  border-color: var(--indigo);
+  color: var(--washi);
+}
+
+/* 句の途中では折り返さない */
+.kami .phrase, .kami-kana .phrase, .shimo-kanji .phrase, .shimo-kana .phrase {
+  display: inline-block;
+}
+
+.kami .phrase + .phrase, .kami-kana .phrase + .phrase,
+.shimo-kanji .phrase + .phrase, .shimo-kana .phrase + .phrase {
+  margin-inline-start: 0.7em;
+}
+
+.choice[aria-checked="true"] small { color: color-mix(in srgb, var(--washi) 75%, transparent); }
+
+/* ── ボタン ───────────────────────────────── */
+.primary, .ghost {
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: transform 0.12s, box-shadow 0.15s, background 0.15s;
+}
+
+.primary {
+  display: block;
+  width: min(320px, 100%);
+  margin: 26px auto 0;
+  padding: 14px 24px;
+  font-size: 1.15rem;
+  letter-spacing: 0.25em;
+  text-indent: 0.25em;
+  color: var(--on-accent);
+  background: var(--crimson);
+  border: none;
+  box-shadow: var(--shadow);
+}
+
+.primary:hover { transform: translateY(-1px); }
+.primary:active { transform: translateY(1px); }
+
+.ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  padding: 8px 18px;
+  font-size: 0.9rem;
+}
+
+.ghost:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+kbd {
+  font-family: var(--mono);
+  font-size: 0.72em;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  padding: 0 0.4em;
+  margin-inline-start: 0.7em;
+  opacity: 0.75;
+  letter-spacing: 0;
+  text-indent: 0;
+}
+
+.best { text-align: center; color: var(--gold); margin: 14px 0 0; font-size: 0.95rem; min-height: 1.7em; }
+
+.note {
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 0.83rem;
+  margin-top: 22px;
+  line-height: 1.9;
+}
+
+.note code { font-family: var(--mono); font-size: 0.95em; }
+
+/* ── HUD ──────────────────────────────────── */
+.hud {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.hud-item { display: flex; flex-direction: column; align-items: center; min-width: 4.5em; }
+.hud-label { font-size: 0.72rem; letter-spacing: 0.2em; color: var(--ink-faint); }
+.hud-value { font-size: 1.25rem; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+.hud-value small { font-size: 0.6em; margin-left: 0.15em; font-family: var(--serif); color: var(--ink-faint); }
+
+.progress-bar { height: 3px; background: var(--line); border-radius: 999px; overflow: hidden; }
+#progress-fill { height: 100%; width: 0; background: var(--indigo); transition: width 0.3s ease; }
+
+/* ── 歌札 ─────────────────────────────────── */
+.card {
+  margin: clamp(18px, 4vw, 30px) 0;
+  padding: clamp(20px, 4.5vw, 38px);
+  background: color-mix(in srgb, var(--washi-deep) 60%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  position: relative;
+}
+
+.card.miss { animation: shake 0.22s; }
+@keyframes shake {
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.card.clear { border-color: color-mix(in srgb, var(--gold) 60%, var(--line)); }
+
+.poem-no {
+  margin: 0 0 0.8em;
+  font-size: 0.82rem;
+  letter-spacing: 0.2em;
+  color: var(--ink-faint);
+  display: flex;
+  justify-content: space-between;
+  gap: 1em;
+}
+
+.author { color: var(--ink-soft); }
+
+.kami {
+  margin: 0;
+  font-size: clamp(1.35rem, 4.6vw, 2.1rem);
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+}
+
+.kami-kana {
+  margin: 0.5em 0 0;
+  font-size: clamp(0.85rem, 2.6vw, 1rem);
+  color: var(--ink-soft);
+  letter-spacing: 0.08em;
+}
+
+.rule { border: 0; border-top: 1px dashed var(--line); margin: clamp(16px, 3vw, 24px) 0; }
+
+.shimo-kanji {
+  margin: 0 0 0.5em;
+  font-size: clamp(1.2rem, 4vw, 1.7rem);
+  color: var(--ink-soft);
+}
+
+.shimo-kana {
+  margin: 0;
+  font-size: clamp(1.4rem, 5vw, 2.15rem);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.55;
+  min-height: 1.6em;
+}
+
+.shimo-kana .done { color: var(--ink-faint); }
+.shimo-kana .todo { color: var(--ink); }
+.shimo-kana .cursor {
+  color: var(--crimson);
+  border-bottom: 3px solid var(--crimson);
+}
+
+.romaji {
+  margin: 0.9em 0 0;
+  font-family: var(--mono);
+  font-size: clamp(0.95rem, 3.1vw, 1.25rem);
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+  word-break: break-all;
+  min-height: 1.6em;
+}
+
+.romaji .done { color: var(--ink-faint); text-decoration: line-through; text-decoration-color: var(--line); }
+.romaji .next { color: var(--crimson); font-weight: 700; }
+
+.hint-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  flex-wrap: wrap;
+}
+
+.ime-warn { color: var(--crimson); font-size: 0.88rem; }
+
+.capture {
+  position: fixed;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+  bottom: 0;
+  left: 0;
+}
+
+/* ── 結果 ─────────────────────────────────── */
+.rank {
+  margin: 0.1em 0 0;
+  font-size: clamp(2.4rem, 9vw, 3.6rem);
+  letter-spacing: 0.1em;
+  color: var(--crimson);
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: clamp(16px, 3vw, 24px);
+  background: color-mix(in srgb, var(--washi-deep) 60%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.result-grid > div { text-align: center; }
+.result-grid dt { font-size: 0.74rem; letter-spacing: 0.2em; color: var(--ink-faint); }
+.result-grid dd { margin: 0.2em 0 0; font-family: var(--mono); font-size: 1.5rem; }
+.result-grid dd small { font-size: 0.6em; color: var(--ink-faint); font-family: var(--serif); }
+
+.result-actions { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.result-actions .ghost { margin-top: -2px; }
+
+.review { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 12px; }
+.review summary { cursor: pointer; color: var(--ink-soft); font-size: 0.92rem; }
+.review-list { padding-inline-start: 1.4em; color: var(--ink-soft); }
+.review-list li { margin: 0.6em 0; }
+.review-list b { color: var(--ink); font-weight: 600; }
+.review-list span { font-size: 0.85em; color: var(--ink-faint); margin-inline-start: 0.6em; font-family: var(--mono); }
+
+.footer {
+  text-align: center;
+  padding: 16px;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  display: flex;
+  gap: 1.2em;
+  justify-content: center;
+}
+
+.footer a { color: inherit; }
+
+@media (max-width: 560px) {
+  .setting { grid-template-columns: 1fr; gap: 6px; }
+  .hud-item { min-width: 3.6em; }
+  .hud-value { font-size: 1.05rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

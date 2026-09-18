@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>百人一首タイピング</title>
+<meta name="description" content="上の句が詠まれたら下の句をローマ字で打つ、小倉百人一首のタイピング練習ゲーム。">
+<meta property="og:title" content="百人一首タイピング">
+<meta property="og:description" content="上の句が詠まれたら下の句をローマ字で打つ、小倉百人一首のタイピング練習ゲーム。">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231b2a4a'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%23f3ece1' font-family='serif'%3E歌%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="./src/styles.css">
+</head>
+<body>
+<div class="paper"></div>
+
+<main id="app">
+  <!-- ▼ スタート画面 -->
+  <section id="screen-start" class="screen">
+    <header class="title-block">
+      <p class="kicker">小倉百人一首</p>
+      <h1 class="title">百人一首<span class="title-sub">タイピング</span></h1>
+      <p class="lead">上の句が出たら、下の句をローマ字で打つ。</p>
+    </header>
+
+    <div class="settings">
+      <div class="setting">
+        <span class="setting-label">出題数</span>
+        <div class="choices" id="choice-count" role="radiogroup" aria-label="出題数">
+          <button class="choice" data-value="5" role="radio">5首</button>
+          <button class="choice" data-value="10" role="radio">10首</button>
+          <button class="choice" data-value="25" role="radio">25首</button>
+          <button class="choice" data-value="100" role="radio">100首</button>
+        </div>
+      </div>
+      <div class="setting">
+        <span class="setting-label">出題順</span>
+        <div class="choices" id="choice-order" role="radiogroup" aria-label="出題順">
+          <button class="choice" data-value="random" role="radio">ランダム</button>
+          <button class="choice" data-value="serial" role="radio">番号順</button>
+        </div>
+      </div>
+      <div class="setting">
+        <span class="setting-label">難易度</span>
+        <div class="choices" id="choice-level" role="radiogroup" aria-label="難易度">
+          <button class="choice" data-value="easy" role="radio">初級<small>かな＋ローマ字</small></button>
+          <button class="choice" data-value="normal" role="radio">中級<small>かなのみ</small></button>
+          <button class="choice" data-value="hard" role="radio">上級<small>漢字のみ</small></button>
+        </div>
+      </div>
+    </div>
+
+    <button id="btn-start" class="primary">はじめる<kbd>Enter</kbd></button>
+    <p id="best-record" class="best"></p>
+    <p class="note">日本語入力は<strong>オフ（直接入力）</strong>にしてください。<br>「し」は <code>shi</code> / <code>si</code>、「ん」は <code>n</code> / <code>nn</code> など複数のローマ字入力に対応しています。</p>
+  </section>
+
+  <!-- ▼ プレイ画面 -->
+  <section id="screen-play" class="screen" hidden>
+    <div class="hud">
+      <div class="hud-item"><span class="hud-label">進捗</span><span id="hud-progress" class="hud-value">1 / 10</span></div>
+      <div class="hud-item"><span class="hud-label">時間</span><span id="hud-time" class="hud-value">0.0<small>秒</small></span></div>
+      <div class="hud-item"><span class="hud-label">打鍵/分</span><span id="hud-kpm" class="hud-value">0</span></div>
+      <div class="hud-item"><span class="hud-label">正確率</span><span id="hud-acc" class="hud-value">100<small>%</small></span></div>
+      <div class="hud-item"><span class="hud-label">ミス</span><span id="hud-miss" class="hud-value">0</span></div>
+    </div>
+    <div class="progress-bar"><div id="progress-fill"></div></div>
+
+    <article class="card" id="card">
+      <p class="poem-no"><span id="poem-no">一番</span> <span id="poem-author" class="author">天智天皇</span></p>
+      <p class="kami" id="kami">秋の田の かりほの庵の 苫をあらみ</p>
+      <p class="kami-kana" id="kami-kana">あきのたの かりほのいほの とまをあらみ</p>
+      <hr class="rule">
+      <p class="shimo-kanji" id="shimo-kanji" hidden>わが衣手は 露にぬれつつ</p>
+      <p class="shimo-kana" id="shimo-kana"></p>
+      <p class="romaji" id="romaji"></p>
+    </article>
+
+    <p class="hint-bar">
+      <button id="btn-quit" class="ghost">やめる<kbd>Esc</kbd></button>
+      <span class="ime-warn" id="ime-warn" hidden>日本語入力がオンになっていませんか？</span>
+    </p>
+    <input id="capture" class="capture" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-hidden="true" tabindex="-1">
+  </section>
+
+  <!-- ▼ 結果画面 -->
+  <section id="screen-result" class="screen" hidden>
+    <header class="title-block">
+      <p class="kicker">結果</p>
+      <h2 class="rank" id="result-rank">歌仙</h2>
+    </header>
+    <dl class="result-grid">
+      <div><dt>時間</dt><dd id="r-time">-</dd></div>
+      <div><dt>打鍵数</dt><dd id="r-keys">-</dd></div>
+      <div><dt>打鍵/分</dt><dd id="r-kpm">-</dd></div>
+      <div><dt>正確率</dt><dd id="r-acc">-</dd></div>
+      <div><dt>ミス</dt><dd id="r-miss">-</dd></div>
+      <div><dt>詠んだ歌</dt><dd id="r-count">-</dd></div>
+    </dl>
+    <p id="r-best" class="best"></p>
+    <div class="result-actions">
+      <button id="btn-again" class="primary">もう一度<kbd>Enter</kbd></button>
+      <button id="btn-home" class="ghost">最初の画面へ</button>
+    </div>
+    <details class="review">
+      <summary>詠んだ歌をふりかえる</summary>
+      <ol id="review-list" class="review-list"></ol>
+    </details>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>百人一首タイピング</span>
+  <a href="https://github.com/onishi/100type">GitHub</a>
+</footer>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
