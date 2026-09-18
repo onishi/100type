@@ -3,10 +3,14 @@ import assert from "node:assert/strict";
 import { TypingTarget, tokenize } from "../src/romaji.js";
 import { POEMS } from "../src/data/poems.js";
 
-function typeAll(kana, input, modern) {
-  const t = new TypingTarget(kana, modern);
+function typeAll(kana, input, modern, sound) {
+  const t = new TypingTarget(kana, modern, sound);
   for (const ch of input) t.input(ch);
   return t;
+}
+
+function target(poem) {
+  return new TypingTarget(poem.shimoKana, poem.shimoModern, poem.shimoSound);
 }
 
 test("拗音・促音をチャンク化する", () => {
@@ -33,20 +37,51 @@ test("hint() のローマ字でも打ち切れる", () => {
   }
 });
 
-test("旧仮名・新仮名のどちらでも打ち切れる", () => {
+test("旧仮名・新仮名・発音どおりのどれでも打ち切れる", () => {
   for (const p of POEMS) {
-    for (const kana of [p.shimoKana, p.shimoModern]) {
+    for (const kana of [p.shimoKana, p.shimoModern, p.shimoSound]) {
       const input = TypingTarget.canonical(kana);
-      const t = typeAll(p.shimoKana, input, p.shimoModern);
+      const t = typeAll(p.shimoKana, input, p.shimoModern, p.shimoSound);
       assert.ok(t.done, `${p.n}: ${kana} / ${input}`);
       assert.equal(t.missCount, 0, `${p.n}: ${kana} / ${input}`);
     }
   }
 });
 
+test("助詞の「は」は wa でも ha でも打てる", () => {
+  const cases = [
+    [1, "wagakoromodewatsuyuninuretsutsu"],
+    [1, "wagakoromodehatsuyuninuretsutsu"],
+    [53, "ikanihisashikimonotokawashiru"],
+    [58, "idesoyohitoowasureyawasuru"],
+    [74, "hageshikaretowainoranumonoo"],
+    [99, "yooomouyuenimonoomoumiwa"],
+  ];
+  for (const [n, input] of cases) {
+    const p = POEMS[n - 1];
+    const t = typeAll(p.shimoKana, input, p.shimoModern, p.shimoSound);
+    assert.ok(t.done, `${n} <- ${input}`);
+    assert.equal(t.missCount, 0, `${n} <- ${input}`);
+  }
+});
+
+test("助詞でない「は」は wa では打てない", () => {
+  const cases = [
+    [35, "wanazomukashinokaninioikeru"], // 花ぞ昔の
+    [74, "wageshikaretowainoranumonoo"], // はげしかれ
+    [60, "madafumimimizuamanowashidate"], // 天の橋立
+    [29, "okimadowaserushiragikunowana"], // 白菊の花
+  ];
+  for (const [n, input] of cases) {
+    const p = POEMS[n - 1];
+    const t = typeAll(p.shimoKana, input, p.shimoModern, p.shimoSound);
+    assert.ok(!t.done, `${n} は wa で打ててしまった: ${input}`);
+  }
+});
+
 test("表示は旧仮名のまま（ヒントは歌の表記に従う）", () => {
   for (const p of POEMS) {
-    const t = new TypingTarget(p.shimoKana, p.shimoModern);
+    const t = target(p);
     assert.equal(t.hint(), TypingTarget.canonical(p.shimoKana), `${p.n}`);
   }
 });
@@ -80,6 +115,12 @@ test("読み上げ用の現代仮名が全首そろっている", () => {
       p.shimoModern.split(/\s+/).length,
       p.shimoKana.split(/\s+/).length,
       `${p.n}: 句の数が旧仮名と合わない`
+    );
+    assert.match(p.shimoSound, /^[ぁ-んー 　]+$/u, `${p.n}`);
+    assert.equal(
+      tokenize(p.shimoSound).length,
+      tokenize(p.shimoModern).length,
+      `${p.n}: 発音どおりの表記の長さが新仮名と合わない`
     );
   }
 });

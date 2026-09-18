@@ -67,7 +67,7 @@ export function tokenize(kana) {
 function optionsAt(seq, i) {
   const token = seq[i];
   const next = seq[i + 1];
-  if (token !== SOKUON) return optionsOf(token, next);
+  if (token !== SOKUON) return [...optionsOf(token, next)];
   // 促音は次の音の子音を重ねる。「った」なら t + ta。
   const heads = [];
   if (next && next !== SOKUON && next !== HATSUON) {
@@ -159,24 +159,35 @@ function diffTokens(oldTokens, newTokens) {
 
 /**
  * チャンクごとの入力候補を組み立てる。
- * modernKana を渡すと、旧仮名・新仮名のどちらの表記でも打てるようになる。
+ * modernKana を渡すと旧仮名・新仮名のどちらの表記でも、
+ * soundKana を渡すと助詞の「は」を wa と打つような発音どおりの入力でも打てるようになる。
+ * soundKana は modernKana と同じ長さのトークン列であることを前提にする。
  */
-export function buildChunks(kana, modernKana) {
+export function buildChunks(kana, modernKana, soundKana) {
   const tokens = tokenize(kana);
   if (!modernKana) {
     return tokens.map((token, i) => ({ kana: token, options: optionsAt(tokens, i) }));
   }
 
   const modernTokens = tokenize(modernKana);
+  const soundTokens = soundKana ? tokenize(soundKana) : null;
+  const useSound = Boolean(soundTokens) && soundTokens.length === modernTokens.length;
+
   const chunks = [];
   for (const op of diffTokens(tokens, modernTokens)) {
     if (op.type === "equal") {
       for (let i = op.oldStart; i < op.oldEnd; i++) {
-        chunks.push({ kana: tokens[i], options: optionsAt(tokens, i) });
+        const j = op.newStart + (i - op.oldStart);
+        const options = optionsAt(tokens, i);
+        // 助詞の「は」を わ と打つなど、発音どおりの入力も受け付ける
+        if (useSound && soundTokens[j] !== modernTokens[j]) {
+          options.push(...expandRun([soundTokens[j], ...tokens.slice(i + 1)], 1));
+        }
+        chunks.push({ kana: tokens[i], options: [...new Set(options)] });
       }
       continue;
     }
-    // 表記が違う部分は一塊にして、旧仮名の候補と新仮名の候補を両方受け付ける
+    // 表記が違う部分は一塊にして、旧仮名・新仮名・発音どおりの候補をまとめて受け付ける
     const oldRun = tokens.slice(op.oldStart, op.oldEnd);
     const newRun = modernTokens.slice(op.newStart, op.newEnd);
     const tail = tokens.slice(op.oldEnd);
@@ -184,6 +195,12 @@ export function buildChunks(kana, modernKana) {
       ...expandRun([...oldRun, ...tail], oldRun.length),
       ...expandRun([...newRun, ...tail], newRun.length),
     ];
+    if (useSound) {
+      const soundRun = soundTokens.slice(op.newStart, op.newEnd);
+      if (soundRun.join("") !== newRun.join("")) {
+        options.push(...expandRun([...soundRun, ...tail], soundRun.length));
+      }
+    }
     chunks.push({ kana: oldRun.join(""), options: [...new Set(options)] });
   }
   return chunks;
@@ -204,12 +221,12 @@ function optionsOf(token, next) {
 /**
  * 1首分のタイピング判定。
  * 生きている状態（チャンク位置・候補・候補内オフセット）の集合を保持する。
- * modernKana を渡すと、旧仮名・新仮名のどちらの表記でも打てる。
+ * modernKana / soundKana を渡すと、旧仮名・新仮名・発音どおりのどれでも打てる。
  */
 export class TypingTarget {
-  constructor(kana, modernKana) {
+  constructor(kana, modernKana, soundKana) {
     this.kana = kana;
-    this.chunks = buildChunks(kana, modernKana);
+    this.chunks = buildChunks(kana, modernKana, soundKana);
     this.typed = "";
     this.missCount = 0;
     this.states = this.chunks.length ? [{ ci: 0, oi: 0, pos: 0 }] : [];
