@@ -55,8 +55,21 @@
       <div class="setting">
         <span class="setting-label">音</span>
         <div class="choices" id="choice-sound">
-          <button class="choice" data-key="voice" role="switch">詠み上げ<small>音声合成</small></button>
+          <button class="choice" data-key="voice" role="switch">詠み上げ<small>上の句</small></button>
+          <button class="choice" data-key="readShimo" role="switch">下の句も詠む</button>
           <button class="choice" data-key="se" role="switch">効果音<small>打鍵・ミス</small></button>
+        </div>
+      </div>
+      <div class="setting" id="voice-setting">
+        <span class="setting-label">詠み手</span>
+        <div class="choices">
+          <select id="voice-select" class="select" aria-label="詠み手の声"></select>
+          <span class="choices" id="choice-rate" role="radiogroup" aria-label="詠み上げの速さ">
+            <button class="choice" data-value="0.7" role="radio">ゆっくり</button>
+            <button class="choice" data-value="0.8" role="radio">ふつう</button>
+            <button class="choice" data-value="0.95" role="radio">はやい</button>
+          </span>
+          <button id="btn-try-voice" class="ghost">試し読み</button>
         </div>
       </div>
       <div class="setting">
@@ -72,7 +85,7 @@
     <p id="voice-notice" class="voice-notice" hidden></p>
     <button id="btn-start" class="primary">はじめる<kbd>Enter</kbd></button>
     <p id="best-record" class="best"></p>
-    <p class="note">上の句が出たあと、少し置いてから下の句が表示されます（<code>Space</code> ですぐ表示）。<br>日本語入力は<strong>オフ（直接入力）</strong>にしてください。<br>「し」は <code>shi</code> / <code>si</code>、「ん」は <code>n</code> / <code>nn</code> など複数のローマ字入力に対応。<br>旧仮名・新仮名のどちらでも打てます（「あはで」＝<code>ahade</code> / <code>awade</code>）。<br>助詞の「は」「を」は読みどおり <code>wa</code> / <code>o</code> でも打てます。</p>
+    <p class="note">上の句が出たあと、少し置いてから下の句が表示されます（<code>Space</code> ですぐ表示）。<br>打ち終えると詠み手が下の句を詠みます（<code>Space</code> で次の歌へ）。<br>日本語入力は<strong>オフ（直接入力）</strong>にしてください。<br>「し」は <code>shi</code> / <code>si</code>、「ん」は <code>n</code> / <code>nn</code> など複数のローマ字入力に対応。<br>旧仮名・新仮名のどちらでも打てます（「あはで」＝<code>ahade</code> / <code>awade</code>）。<br>助詞の「は」「を」は読みどおり <code>wa</code> / <code>o</code> でも打てます。</p>
   </section>
 
   <!-- ▼ プレイ画面 -->

@@ -6,7 +6,17 @@ const $ = (id) => document.getElementById(id);
 const SETTINGS_KEY = "100type.settings";
 const BEST_KEY = "100type.best";
 
-const DEFAULTS = { count: 10, order: "random", level: "easy", wait: 2000, voice: true, se: true };
+const DEFAULTS = {
+  count: 10,
+  order: "random",
+  level: "easy",
+  wait: 2000,
+  voice: true,
+  readShimo: true,
+  se: true,
+  rate: 0.8,
+  voiceName: "",
+};
 const RANKS = [
   [300, "歌聖"],
   [220, "歌仙"],
@@ -39,6 +49,8 @@ const el = {
   reading: $("reading"),
   readingLabel: $("reading-label"),
   voiceNotice: $("voice-notice"),
+  voiceSetting: $("voice-setting"),
+  voiceSelect: $("voice-select"),
   mute: $("btn-mute"),
   readingFill: $("reading-fill"),
   capture: $("capture"),
@@ -53,6 +65,8 @@ const settings = loadSettings();
 let game = null;
 let tick = null;
 let revealTimer = null;
+let advanceTimer = null;
+let pendingAdvance = null;
 
 /* ── 設定 ─────────────────────────────────── */
 function loadSettings() {
@@ -84,7 +98,7 @@ function bindChoices(containerId, key, onChange) {
     const btn = e.target.closest(".choice");
     if (!btn) return;
     const raw = btn.dataset.value;
-    settings[key] = key === "count" || key === "wait" ? Number(raw) : raw;
+    settings[key] = ["count", "wait", "rate"].includes(key) ? Number(raw) : raw;
     saveSettings();
     paint();
     onChange?.();
@@ -113,6 +127,27 @@ function bindToggles(containerId) {
   paint();
 }
 
+/** 読み上げに渡す共通の設定 */
+function voiceOptions(extra) {
+  return { rate: settings.rate, voiceName: settings.voiceName, ...extra };
+}
+
+/** 選べる詠み手の一覧を作る */
+function renderVoiceList() {
+  const list = audio.japaneseVoices();
+  el.voiceSetting.hidden = list.length === 0;
+  if (!list.length) return;
+  const current = audio.japaneseVoice(settings.voiceName);
+  el.voiceSelect.replaceChildren();
+  for (const v of list) {
+    const option = document.createElement("option");
+    option.value = v.name;
+    option.textContent = v.localService ? v.name : `${v.name}（オンライン）`;
+    option.selected = current && v.name === current.name;
+    el.voiceSelect.append(option);
+  }
+}
+
 /** 日本語の音声が見つからないブラウザではその旨を伝える */
 function updateVoiceNotice() {
   const missing = settings.voice && !audio.speechAvailable();
@@ -120,6 +155,12 @@ function updateVoiceNotice() {
   el.voiceNotice.textContent = missing
     ? "このブラウザでは日本語の音声が見つかりません。詠み上げは鳴りませんが、そのまま遊べます。"
     : "";
+}
+
+/** 選んだ声で一句だけ読んでみる */
+function tryVoice() {
+  audio.unlock();
+  audio.speak("あきのたの かりほのいおの とまおあらみ", voiceOptions());
 }
 
 function updateMuteButton() {
@@ -182,6 +223,8 @@ function pickPoems() {
 
 function startGame() {
   audio.unlock();
+  clearTimeout(advanceTimer);
+  pendingAdvance = null;
   game = {
     poems: pickPoems(),
     index: 0,
@@ -243,7 +286,8 @@ function startReading() {
   audio.stopSpeaking();
 
   const poem = game.poems[game.index];
-  const speaking = settings.voice && audio.speak(poem.kamiSpeech, { onPhrase: highlightPhrase });
+  const speaking =
+    settings.voice && audio.speak(poem.kamiSpeech, voiceOptions({ onPhrase: highlightPhrase }));
   el.readingLabel.firstChild.textContent = speaking ? "詠み上げ中" : "まもなく下の句";
   if (!speaking) highlightPhrase(-1);
 
@@ -264,10 +308,20 @@ function startReading() {
 
 /** 読み上げ中の句を光らせる（-1 で消す） */
 function highlightPhrase(index) {
-  const phrases = el.kami.querySelectorAll(".phrase");
-  phrases.forEach((node, i) => node.classList.toggle("speaking", i === index));
-  const kana = el.kamiKana.querySelectorAll(".phrase");
-  kana.forEach((node, i) => node.classList.toggle("speaking", i === index));
+  highlightIn(el.kami, index);
+  highlightIn(el.kamiKana, index);
+}
+
+/** 下の句を詠むときは下の句の側を光らせる */
+function highlightShimoPhrase(index) {
+  highlightIn(el.shimoKana, index);
+  highlightIn(el.shimoKanji, index);
+}
+
+function highlightIn(node, index) {
+  node.querySelectorAll(".phrase").forEach((phrase, i) => {
+    phrase.classList.toggle("speaking", i === index);
+  });
 }
 
 function reveal() {
@@ -379,13 +433,28 @@ function completePoem() {
   el.card.classList.add("clear");
   if (settings.se) audio.sfx.clear();
   game.index++;
-  if (game.index >= game.poems.length) {
-    finishGame();
-    return;
-  }
-  setTimeout(() => {
-    if (game && !game.finished) loadPoem();
-  }, 260);
+  const last = game.index >= game.poems.length;
+
+  const advance = () => {
+    clearTimeout(advanceTimer);
+    pendingAdvance = null;
+    highlightPhrase(-1);
+    highlightShimoPhrase(-1);
+    if (!game || game.finished) return;
+    if (last) finishGame();
+    else loadPoem();
+  };
+
+  // 詠み手が下の句を続けて詠む（読み札のように歌を最後まで聞かせる）
+  const reciting =
+    settings.voice &&
+    settings.readShimo &&
+    audio.speak(
+      poem.shimoSound,
+      voiceOptions({ onPhrase: highlightShimoPhrase, onEnd: advance })
+    );
+  pendingAdvance = advance;
+  advanceTimer = setTimeout(advance, reciting ? 9000 : 260);
 }
 
 function elapsedSeconds() {
@@ -415,8 +484,11 @@ function updateHud() {
 
 function finishGame() {
   game.finished = true;
+  clearTimeout(advanceTimer);
+  pendingAdvance = null;
   audio.stopSpeaking();
   highlightPhrase(-1);
+  highlightShimoPhrase(-1);
   if (settings.se) audio.sfx.finish();
   clearTimeout(revealTimer);
   el.reading.classList.add("invisible");
@@ -463,6 +535,8 @@ function finishGame() {
 function quitGame() {
   clearInterval(tick);
   clearTimeout(revealTimer);
+  clearTimeout(advanceTimer);
+  pendingAdvance = null;
   audio.stopSpeaking();
   highlightPhrase(-1);
   game = null;
@@ -485,6 +559,14 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   if (!playing || !game || game.finished) return;
+
+  // 下の句を詠み上げている間に Space / Enter を押したら次の歌へ
+  if (pendingAdvance && (e.key === " " || e.key === "Spacebar" || e.key === "Enter")) {
+    e.preventDefault();
+    audio.stopSpeaking();
+    pendingAdvance();
+    return;
+  }
 
   // 詠み上げを待たずに下の句を出す
   if (game.phase === "reading" && (e.key === " " || e.key === "Spacebar")) {
@@ -519,6 +601,13 @@ bindChoices("choice-count", "count", renderBest);
 bindChoices("choice-order", "order", renderBest);
 bindChoices("choice-wait", "wait", renderBest);
 bindToggles("choice-sound");
+bindChoices("choice-rate", "rate");
+el.voiceSelect.addEventListener("change", () => {
+  settings.voiceName = el.voiceSelect.value;
+  saveSettings();
+  tryVoice();
+});
+$("btn-try-voice").addEventListener("click", tryVoice);
 bindChoices("choice-level", "level", renderBest);
 $("btn-start").addEventListener("click", startGame);
 $("btn-again").addEventListener("click", startGame);
@@ -540,9 +629,13 @@ $("btn-mute").addEventListener("click", () => {
   focusCapture();
 });
 renderBest();
+renderVoiceList();
 updateVoiceNotice();
 updateMuteButton();
 // 音声一覧は非同期に読み込まれることがある
 if (typeof speechSynthesis !== "undefined") {
-  speechSynthesis.addEventListener?.("voiceschanged", updateVoiceNotice);
+  speechSynthesis.addEventListener?.("voiceschanged", () => {
+    renderVoiceList();
+    updateVoiceNotice();
+  });
 }

@@ -132,6 +132,22 @@ body {
 
 .choice small { font-size: 0.72em; color: var(--ink-faint); }
 
+.select {
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 14px;
+  max-width: 15em;
+  cursor: pointer;
+}
+
+.select:hover { border-color: color-mix(in srgb, var(--indigo) 55%, var(--line)); }
+
+.select option { color: initial; }
+
 .choice:hover { border-color: color-mix(in srgb, var(--indigo) 55%, var(--line)); }
 
 .choice[aria-checked="true"] {
@@ -277,8 +293,12 @@ kbd {
 .kami .phrase, .kami-kana .phrase { transition: color 0.25s ease; }
 
 /* 読み上げ中の句 */
-.kami .phrase.speaking { color: var(--crimson); }
-.kami-kana .phrase.speaking { color: var(--crimson); }
+.kami .phrase.speaking,
+.kami-kana .phrase.speaking,
+.shimo-kana .phrase.speaking,
+.shimo-kanji .phrase.speaking { color: var(--crimson); }
+
+.shimo-kana .phrase, .shimo-kanji .phrase { transition: color 0.25s ease; }
 
 .kami-kana {
   margin: 0.5em 0 0;

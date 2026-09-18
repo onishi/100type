@@ -69,13 +69,28 @@ if (synth) {
   synth.addEventListener?.("voiceschanged", loadVoices);
 }
 
-/** 日本語の音声があれば返す */
-export function japaneseVoice() {
-  if (!synth) return null;
+// 声の好み。詠み上げに向く、落ち着いた日本語音声を先に選ぶ。
+const VOICE_PREFERENCE = ["Google 日本語", "Kyoko", "O-Ren", "Otoya", "Nanami", "Ayumi", "Haruka", "Hattori", "Ichiro"];
+
+/** 使える日本語の音声を一覧で返す */
+export function japaneseVoices() {
+  if (!synth) return [];
   if (!voices.length) loadVoices();
-  const ja = voices.filter((v) => (v.lang || "").toLowerCase().startsWith("ja"));
+  return voices.filter((v) => (v.lang || "").toLowerCase().startsWith("ja"));
+}
+
+/** 日本語の音声があれば返す（name を指定すればその声を優先） */
+export function japaneseVoice(name) {
+  const ja = japaneseVoices();
   if (!ja.length) return null;
-  // ローカル再生できる音声を優先する（オフラインでも鳴る）
+  if (name) {
+    const chosen = ja.find((v) => v.name === name);
+    if (chosen) return chosen;
+  }
+  for (const key of VOICE_PREFERENCE) {
+    const hit = ja.find((v) => (v.name || "").includes(key));
+    if (hit) return hit;
+  }
   return ja.find((v) => v.localService) || ja[0];
 }
 
@@ -83,22 +98,24 @@ export function speechAvailable() {
   return Boolean(japaneseVoice());
 }
 
-const PHRASE_GAP_MS = 420; // 五・七・五の句のあいだに置く間
-const SPEECH_RATE = 0.8;
+const PHRASE_GAP_MS = 420; // 句のあいだに置く間
+export const DEFAULT_RATE = 0.8;
+const FINAL_PHRASE_RATE = 0.9; // 結びの句は少しゆっくり読む
 let speechSeq = 0;
 
 /** onend が来ないブラウザでも止まらないよう、読み終わりの見込み時間を出す */
-function estimateMs(text) {
-  return Math.round((text.length * 200) / SPEECH_RATE) + 1500;
+function estimateMs(text, rate) {
+  return Math.round((text.length * 200) / Math.max(rate, 0.3)) + 1500;
 }
 
 /**
- * 上の句を五・七・五に区切って読み上げる。読み上げを始められたら true。
- * @param {string} text 空白で句に区切った現代仮名遣いの読み
- * @param {{ onPhrase?: (index: number) => void, onEnd?: () => void }} handlers
+ * 歌を句ごとに区切って読み上げる。読み上げを始められたら true。
+ * @param {string} text 空白で句に区切った読み
+ * @param {{ onPhrase?: (index: number) => void, onEnd?: () => void,
+ *           rate?: number, voiceName?: string }} options
  */
-export function speak(text, { onPhrase, onEnd } = {}) {
-  const voice = japaneseVoice();
+export function speak(text, { onPhrase, onEnd, rate = DEFAULT_RATE, voiceName } = {}) {
+  const voice = japaneseVoice(voiceName);
   if (!synth || !voice) return false;
   const phrases = String(text).split(/[\s、]+/).filter(Boolean);
   if (!phrases.length) return false;
@@ -127,7 +144,9 @@ export function speak(text, { onPhrase, onEnd } = {}) {
       clearTimeout(guard);
       setTimeout(() => speakPhrase(i + 1), i + 1 < phrases.length ? PHRASE_GAP_MS : 0);
     };
-    const guard = setTimeout(advance, estimateMs(phrases[i]));
+    const last = i === phrases.length - 1;
+    const phraseRate = last ? rate * FINAL_PHRASE_RATE : rate;
+    const guard = setTimeout(advance, estimateMs(phrases[i], phraseRate));
     try {
       const utterance = new SpeechSynthesisUtterance(phrases[i]);
       utterance.lang = voice.lang || "ja-JP";
@@ -136,7 +155,7 @@ export function speak(text, { onPhrase, onEnd } = {}) {
       } catch {
         /* 音声を直接指定できない環境では lang 指定にまかせる */
       }
-      utterance.rate = SPEECH_RATE; // 詠み札のようにゆっくり
+      utterance.rate = phraseRate;
       utterance.pitch = 0.95;
       utterance.onend = advance;
       utterance.onerror = advance;
