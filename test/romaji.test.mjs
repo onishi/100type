@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { TypingTarget, tokenize } from "../src/romaji.js";
 import { POEMS } from "../src/data/poems.js";
+import { kimarijiDistribution, kimarijiLength, kimarijiText } from "../src/kimariji.js";
 
 function typeAll(kana, input, modern, sound) {
   const t = new TypingTarget(kana, modern, sound);
@@ -164,4 +165,61 @@ test("ミスタイプはカウントされ入力は進まない", () => {
   assert.equal(t.typed, "");
   assert.ok(t.input("a"));
   assert.equal(t.confirmedKanaLength(), 1);
+});
+
+test("決まり字が歌ごとに定まる", () => {
+  const strip = (t) => t.replace(/\s+/g, "");
+  for (const p of POEMS) {
+    const length = kimarijiLength(p);
+    assert.ok(length >= 1 && length <= 6, `${p.n}: ${length}字`);
+    const others = POEMS.filter((o) => o.n !== p.n);
+    const written = strip(p.kamiKana).slice(0, length);
+    const spoken = strip(p.kamiSpeech).slice(0, length);
+    assert.equal(kimarijiText(p), written, `${p.n}`);
+    // その長さまで聞けば、字でも音でも他の 99 首と区別がつく
+    assert.ok(
+      others.every((o) => !strip(o.kamiKana).startsWith(written)),
+      `${p.n}: 「${written}」では他の歌と区別できない`
+    );
+    assert.ok(
+      others.every((o) => !strip(o.kamiSpeech).startsWith(spoken)),
+      `${p.n}: 音の「${spoken}」では他の歌と区別できない`
+    );
+    // 一文字でも短いと、字か音のどちらかで他の歌とぶつかる
+    if (length > 1) {
+      const shortWritten = written.slice(0, -1);
+      const shortSpoken = spoken.slice(0, -1);
+      assert.ok(
+        others.some((o) => strip(o.kamiKana).startsWith(shortWritten)) ||
+          others.some((o) => strip(o.kamiSpeech).startsWith(shortSpoken)),
+        `${p.n}: 「${shortWritten}」で足りるのに ${length} 字になっている`
+      );
+    }
+  }
+});
+
+test("一字決まりは むすめふさほせ の 7 首", () => {
+  const ones = POEMS.filter((p) => kimarijiLength(p) === 1).map((p) => p.kamiKana[0]);
+  assert.deepEqual([...ones].sort().join(""), [..."むすめふさほせ"].sort().join(""));
+});
+
+test("四字・五字・六字決まりの顔ぶれ", () => {
+  const pick = (n) => POEMS.filter((p) => kimarijiLength(p) === n).map((p) => p.n).sort((a, b) => a - b);
+  assert.deepEqual(pick(6), [11, 15, 31, 50, 64, 76]); // わたのはら / きみがため / あさぼらけ
+  assert.deepEqual(pick(5), [83, 93]); // よのなかよ / よのなかは
+  assert.deepEqual(pick(4), [19, 29, 42, 68, 75, 88]); // なには / こころ / ちぎり
+  assert.deepEqual(kimarijiDistribution()[1], 7);
+});
+
+test("読みのデータが壊れていない", () => {
+  for (const p of POEMS) {
+    // 表示用の読みは歴史的仮名遣いのまま（読み上げ用の置き換えが混ざっていないこと）
+    assert.equal(p.kamiKana.split(/\s+/).length, 3, `${p.n}`);
+    assert.match(p.kamiKana, /^[ぁ-んゐゑー 　]+$/u, `${p.n}`);
+    assert.equal(p.kamiKana.replace(/\s+/g, "").length, p.kamiKana.replace(/\s+/g, "").length);
+  }
+  // 助詞を書き換えた読み上げ用と、表示用は別物であること
+  const n93 = POEMS[92];
+  assert.equal(n93.kamiKana.split(/\s+/)[0], "よのなかは");
+  assert.equal(n93.kamiSpeech.split(/\s+/)[0], "よのなかわ");
 });

@@ -1,6 +1,7 @@
 import { POEMS } from "./data/poems.js";
 import { TypingTarget } from "./romaji.js";
 import * as audio from "./audio.js";
+import { kimarijiLabel, kimarijiLength, kimarijiText } from "./kimariji.js";
 
 const $ = (id) => document.getElementById(id);
 const SETTINGS_KEY = "100type.settings";
@@ -32,6 +33,7 @@ const el = {
   },
   card: $("card"),
   poemNo: $("poem-no"),
+  kimariji: $("kimariji-badge"),
   author: $("poem-author"),
   kami: $("kami"),
   kamiKana: $("kami-kana"),
@@ -258,8 +260,9 @@ function loadPoem() {
   el.poemNo.textContent = `第${poem.n}番`;
   el.author.textContent = poem.author;
   setPhrases(el.kami, poem.kami);
-  setPhrases(el.kamiKana, poem.kamiKana);
+  setKamiKana(poem);
   el.kamiKana.hidden = settings.level === "hard";
+  el.kimariji.textContent = kimarijiLabel(poem);
   setPhrases(el.shimoKanji, poem.shimo);
   el.card.classList.remove("clear");
   startReading();
@@ -337,6 +340,29 @@ function reveal() {
   game.phase = "typing";
   el.reading.classList.add("invisible");
   renderTarget();
+}
+
+/** 上の句の読みを句ごとに並べ、決まり字の部分に印をつける */
+function setKamiKana(poem) {
+  const mark = kimarijiLength(poem);
+  el.kamiKana.replaceChildren();
+  let index = 0;
+  for (const phrase of poem.kamiKana.split(/\s+/).filter(Boolean)) {
+    const group = document.createElement("span");
+    group.className = "phrase";
+    for (const ch of phrase) {
+      if (index < mark) {
+        const span = document.createElement("span");
+        span.className = "kimariji";
+        span.textContent = ch;
+        group.append(span);
+      } else {
+        group.append(document.createTextNode(ch));
+      }
+      index++;
+    }
+    el.kamiKana.append(group);
+  }
 }
 
 /** 句（スペース区切り）ごとに折り返すよう inline-block で包む */
@@ -535,7 +561,7 @@ function finishGame() {
     const b = document.createElement("b");
     b.textContent = `${entry.poem.kami} ${entry.poem.shimo}`;
     const meta = document.createElement("span");
-    meta.textContent = `${entry.seconds.toFixed(1)}秒 / ミス${entry.miss}`;
+    meta.textContent = `${kimarijiText(entry.poem)}（${kimarijiLabel(entry.poem)}） / ${entry.seconds.toFixed(1)}秒 / ミス${entry.miss}`;
     li.append(b, meta);
     list.append(li);
   }
