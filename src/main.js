@@ -245,10 +245,13 @@ function startReading() {
   audio.stopSpeaking();
 
   const poem = game.poems[game.index];
-  const speaking = settings.voice && audio.speak(poem.kamiSpeech, onSpeechEnd);
+  const speaking =
+    settings.voice &&
+    audio.speak(poem.kamiSpeech, { onPhrase: highlightPhrase, onEnd: onSpeechEnd });
   game.speechDone = !speaking;
   game.waitDone = settings.wait <= 0;
   el.readingLabel.firstChild.textContent = speaking ? "詠み上げ中" : "まもなく下の句";
+  if (!speaking) highlightPhrase(-1);
 
   if (game.phase !== "reading") {
     el.reading.classList.add("invisible");
@@ -268,6 +271,14 @@ function startReading() {
   }, settings.wait);
   // 読み上げ終了イベントが来ない場合でも必ず表示する
   safetyTimer = setTimeout(reveal, settings.wait + 15000);
+}
+
+/** 読み上げ中の句を光らせる（-1 で消す） */
+function highlightPhrase(index) {
+  const phrases = el.kami.querySelectorAll(".phrase");
+  phrases.forEach((node, i) => node.classList.toggle("speaking", i === index));
+  const kana = el.kamiKana.querySelectorAll(".phrase");
+  kana.forEach((node, i) => node.classList.toggle("speaking", i === index));
 }
 
 function onSpeechEnd() {
@@ -427,6 +438,7 @@ function updateHud() {
 function finishGame() {
   game.finished = true;
   audio.stopSpeaking();
+  highlightPhrase(-1);
   if (settings.se) audio.sfx.finish();
   clearTimeout(revealTimer);
   clearTimeout(safetyTimer);
@@ -476,6 +488,7 @@ function quitGame() {
   clearTimeout(revealTimer);
   clearTimeout(safetyTimer);
   audio.stopSpeaking();
+  highlightPhrase(-1);
   game = null;
   show("start");
   renderBest();
@@ -538,7 +551,10 @@ $("btn-quit").addEventListener("click", quitGame);
 $("btn-mute").addEventListener("click", () => {
   const on = settings.voice || settings.se;
   settings.voice = settings.se = !on;
-  if (!settings.voice) audio.stopSpeaking();
+  if (!settings.voice) {
+    audio.stopSpeaking();
+    highlightPhrase(-1);
+  }
   saveSettings();
   updateMuteButton();
   updateVoiceNotice();

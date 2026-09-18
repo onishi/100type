@@ -83,35 +83,74 @@ export function speechAvailable() {
   return Boolean(japaneseVoice());
 }
 
+const PHRASE_GAP_MS = 420; // 五・七・五の句のあいだに置く間
+const SPEECH_RATE = 0.8;
+let speechSeq = 0;
+
+/** onend が来ないブラウザでも止まらないよう、読み終わりの見込み時間を出す */
+function estimateMs(text) {
+  return Math.round((text.length * 200) / SPEECH_RATE) + 1500;
+}
+
 /**
- * 上の句を読み上げる。読み上げを始められたら true。
- * @param {string} text 現代仮名遣いの読み
- * @param {() => void} onEnd 読み終わり（失敗時も呼ぶ）
+ * 上の句を五・七・五に区切って読み上げる。読み上げを始められたら true。
+ * @param {string} text 空白で句に区切った現代仮名遣いの読み
+ * @param {{ onPhrase?: (index: number) => void, onEnd?: () => void }} handlers
  */
-export function speak(text, onEnd) {
+export function speak(text, { onPhrase, onEnd } = {}) {
   const voice = japaneseVoice();
   if (!synth || !voice) return false;
+  const phrases = String(text).split(/[\s、]+/).filter(Boolean);
+  if (!phrases.length) return false;
+
+  const seq = ++speechSeq;
+  const alive = () => seq === speechSeq;
   try {
     synth.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = voice.lang || "ja-JP";
-    try {
-      utterance.voice = voice;
-    } catch {
-      /* 音声を直接指定できない環境では lang 指定にまかせる */
-    }
-    utterance.rate = 0.85; // 詠み札のようにゆっくり
-    utterance.pitch = 0.95;
-    utterance.onend = () => onEnd?.();
-    utterance.onerror = () => onEnd?.();
-    synth.speak(utterance);
-    return true;
   } catch {
     return false;
   }
+
+  const speakPhrase = (i) => {
+    if (!alive()) return;
+    if (i >= phrases.length) {
+      onPhrase?.(-1);
+      onEnd?.();
+      return;
+    }
+    onPhrase?.(i);
+    let advanced = false;
+    const advance = () => {
+      if (advanced || !alive()) return;
+      advanced = true;
+      clearTimeout(guard);
+      setTimeout(() => speakPhrase(i + 1), i + 1 < phrases.length ? PHRASE_GAP_MS : 0);
+    };
+    const guard = setTimeout(advance, estimateMs(phrases[i]));
+    try {
+      const utterance = new SpeechSynthesisUtterance(phrases[i]);
+      utterance.lang = voice.lang || "ja-JP";
+      try {
+        utterance.voice = voice;
+      } catch {
+        /* 音声を直接指定できない環境では lang 指定にまかせる */
+      }
+      utterance.rate = SPEECH_RATE; // 詠み札のようにゆっくり
+      utterance.pitch = 0.95;
+      utterance.onend = advance;
+      utterance.onerror = advance;
+      synth.speak(utterance);
+    } catch {
+      advance();
+    }
+  };
+
+  speakPhrase(0);
+  return true;
 }
 
 export function stopSpeaking() {
+  speechSeq++; // 途中の句が続かないようにする
   try {
     synth?.cancel();
   } catch {

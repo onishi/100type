@@ -274,6 +274,12 @@ kbd {
   letter-spacing: 0.04em;
 }
 
+.kami .phrase, .kami-kana .phrase { transition: color 0.25s ease; }
+
+/* 読み上げ中の句 */
+.kami .phrase.speaking { color: var(--crimson); }
+.kami-kana .phrase.speaking { color: var(--crimson); }
+
 .kami-kana {
   margin: 0.5em 0 0;
   font-size: clamp(0.85rem, 2.6vw, 1rem);
