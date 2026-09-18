@@ -47,6 +47,7 @@ const el = {
   imeWarn: $("ime-warn"),
   reading: $("reading"),
   readingLabel: $("reading-label"),
+  readingNote: $("reading-note"),
   voiceNotice: $("voice-notice"),
   voiceSetting: $("voice-setting"),
   mute: $("btn-mute"),
@@ -251,6 +252,8 @@ function loadPoem() {
   game.poemMiss = 0;
   // 上の句だけを見せる「詠み上げ」の間。打ち始めは待たずにできる。
   game.phase = settings.wait > 0 ? "reading" : "typing";
+  game.typedDone = false;
+  game.recited = true;
 
   el.poemNo.textContent = `第${poem.n}番`;
   el.author.textContent = poem.author;
@@ -275,7 +278,17 @@ function startReading() {
   const poem = game.poems[game.index];
   const speaking =
     settings.voice && audio.speak(poem.kamiSpeech, voiceOptions({ onPhrase: highlightPhrase }));
+  // 詠み手は打ち手を待たず、上の句に続けて下の句まで詠む
+  game.recited = true;
+  if (speaking && settings.readShimo) {
+    const queued = audio.speak(
+      poem.shimoSound,
+      voiceOptions({ queue: true, onPhrase: highlightShimoPhrase, onEnd: onRecitationEnd })
+    );
+    if (queued) game.recited = false;
+  }
   el.readingLabel.firstChild.textContent = speaking ? "詠み上げ中" : "まもなく下の句";
+  el.readingNote.textContent = "覚えていれば先に打てます／Space ですぐ表示";
   if (!speaking) highlightPhrase(-1);
 
   if (game.phase !== "reading") {
@@ -309,6 +322,13 @@ function highlightIn(node, index) {
   node.querySelectorAll(".phrase").forEach((phrase, i) => {
     phrase.classList.toggle("speaking", i === index);
   });
+}
+
+function onRecitationEnd() {
+  if (!game) return;
+  game.recited = true;
+  highlightShimoPhrase(-1);
+  maybeAdvance();
 }
 
 function reveal() {
@@ -420,28 +440,33 @@ function completePoem() {
   el.card.classList.add("clear");
   if (settings.se) audio.sfx.clear();
   game.index++;
-  const last = game.index >= game.poems.length;
+  game.typedDone = true;
 
-  const advance = () => {
-    clearTimeout(advanceTimer);
-    pendingAdvance = null;
-    highlightPhrase(-1);
-    highlightShimoPhrase(-1);
-    if (!game || game.finished) return;
-    if (last) finishGame();
-    else loadPoem();
-  };
+  // 詠み上げが残っていれば、詠み終わるまで待ってから次の歌へ
+  if (!game.recited) {
+    el.readingLabel.firstChild.textContent = "詠み上げ中";
+    el.readingNote.textContent = "Space で次の歌へ";
+    el.reading.classList.remove("invisible");
+  }
+  pendingAdvance = advanceNow;
+  advanceTimer = setTimeout(advanceNow, game.recited ? 260 : 25000);
+  maybeAdvance();
+}
 
-  // 上の句を読み終えてから、続けて下の句を詠む（歌を最後まで聞かせる）
-  const reciting =
-    settings.voice &&
-    settings.readShimo &&
-    audio.speak(
-      poem.shimoSound,
-      voiceOptions({ queue: true, onPhrase: highlightShimoPhrase, onEnd: advance })
-    );
-  pendingAdvance = advance;
-  advanceTimer = setTimeout(advance, reciting ? 25000 : 260);
+/** 打ち終わりと詠み終わりがそろったら次の歌へ */
+function maybeAdvance() {
+  if (game && !game.finished && game.typedDone && game.recited) advanceNow();
+}
+
+function advanceNow() {
+  clearTimeout(advanceTimer);
+  pendingAdvance = null;
+  highlightPhrase(-1);
+  highlightShimoPhrase(-1);
+  el.reading.classList.add("invisible");
+  if (!game || game.finished) return;
+  if (game.index >= game.poems.length) finishGame();
+  else loadPoem();
 }
 
 function elapsedSeconds() {

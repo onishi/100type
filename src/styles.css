@@ -298,7 +298,15 @@ kbd {
 .shimo-kana .phrase.speaking,
 .shimo-kanji .phrase.speaking { color: var(--crimson); }
 
-.shimo-kana .phrase, .shimo-kanji .phrase { transition: color 0.25s ease; }
+.shimo-kana .phrase, .shimo-kanji .phrase { transition: color 0.25s ease, background 0.25s ease; }
+
+/* 下の句は打鍵の色があるので、詠んでいる句は淡い地で示す */
+.shimo-kana .phrase.speaking,
+.shimo-kanji .phrase.speaking {
+  background: color-mix(in srgb, var(--gold) 22%, transparent);
+  border-radius: 7px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 22%, transparent);
+}
 
 .kami-kana {
   margin: 0.5em 0 0;
