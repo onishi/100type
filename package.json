@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/romaji.test.mjs",
-    "start": "npx --yes http-server -p 8123 -c-1 ."
+    "start": "npx --yes http-server -p 8123 -c-1 .",
+    "build": "rm -rf dist && mkdir -p dist && cp index.html dist/ && cp -R src dist/",
+    "deploy": "npm run build && npx --yes wrangler@latest deploy"
   },
   "license": "MIT"
 }

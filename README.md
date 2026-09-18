@@ -47,6 +47,7 @@ src/main.js         ゲーム進行・入力処理・記録
 src/romaji.js       かな→ローマ字の入力判定エンジン
 src/data/poems.js   小倉百人一首 100 首（上の句・下の句・読み・作者）
 test/               ローマ字エンジンのテスト
+wrangler.jsonc      Cloudflare Workers の設定（dist/ を静的配信）
 ```
 
 ローマ字判定は、かなを「チャンク」に分解し、各チャンクの入力候補を並列に追跡する NFA として実装しています。
@@ -54,15 +55,23 @@ test/               ローマ字エンジンのテスト
 
 ## デプロイ
 
-`.github/workflows/deploy.yml` が push のたびに GitHub Pages へ公開します（ビルド工程なし）。
-テストが通った場合のみ公開されます。
+Cloudflare Workers（静的アセット）で公開しています。
 
-**初回のみ、リポジトリ側で Pages を有効化する必要があります。**
-Settings → Pages → Build and deployment → Source を **GitHub Actions** にしてください。
-（Actions の `GITHUB_TOKEN` では Pages サイトの新規作成ができないため、この操作だけは手動です）
+- 公開 URL: <https://100type.wagaya.workers.dev>
+- 設定: `wrangler.jsonc`（`dist/` をそのまま配信するだけ。ビルド工程は index.html と src/ の複製のみ）
 
-有効化後は Actions タブから `Deploy to GitHub Pages` を再実行すれば公開されます。
-公開 URL は `https://onishi.github.io/100type/` です。
+手元から手動で出す場合:
+
+```bash
+export CLOUDFLARE_API_TOKEN=...   # Workers Scripts:Edit 権限
+export CLOUDFLARE_ACCOUNT_ID=...
+npm run deploy
+```
+
+GitHub Actions（`.github/workflows/ci.yml`）は push のたびにテストを実行し、
+リポジトリに `CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` の Secrets が
+設定されていれば続けてデプロイします。未設定の場合はデプロイだけスキップします
+（ワークフローは失敗しません）。
 
 ## ライセンス
 
