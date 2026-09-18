@@ -219,7 +219,7 @@ function focusCapture() {
 
 function loadPoem() {
   const poem = game.poems[game.index];
-  game.target = new TypingTarget(poem.shimoKana);
+  game.target = new TypingTarget(poem.shimoKana, poem.shimoModern);
   game.poemStartedAt = performance.now();
   game.poemMiss = 0;
   // 上の句だけを見せる「詠み上げ」の間。打ち始めは待たずにできる。

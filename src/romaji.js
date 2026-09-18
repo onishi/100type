@@ -63,26 +63,130 @@ export function tokenize(kana) {
   return tokens;
 }
 
-/** チャンクごとの入力候補（前の候補ほど優先＝ヒント表示に使う） */
-export function buildChunks(kana) {
-  const tokens = tokenize(kana);
-  return tokens.map((token, i) => {
-    const next = tokens[i + 1];
-    let options;
-    if (token === SOKUON) {
-      const heads = [];
-      if (next && next !== SOKUON && next !== HATSUON) {
-        for (const opt of optionsOf(next, tokens[i + 2])) {
-          const head = opt[0];
-          if (!"aiueo".includes(head) && !heads.includes(head)) heads.push(head);
-        }
-      }
-      options = [...heads, "ltu", "xtu", "ltsu", "xtsu"];
-    } else {
-      options = optionsOf(token, next);
+/** 1 トークン分の入力候補（前の候補ほど優先＝ヒント表示に使う） */
+function optionsAt(seq, i) {
+  const token = seq[i];
+  const next = seq[i + 1];
+  if (token !== SOKUON) return optionsOf(token, next);
+  // 促音は次の音の子音を重ねる。「った」なら t + ta。
+  const heads = [];
+  if (next && next !== SOKUON && next !== HATSUON) {
+    for (const opt of optionsOf(next, seq[i + 2])) {
+      const head = opt[0];
+      if (!"aiueo".includes(head) && !heads.includes(head)) heads.push(head);
     }
-    return { kana: token, options };
-  });
+  }
+  return [...heads, "ltu", "xtu", "ltsu", "xtsu"];
+}
+
+/** トークン列の先頭 length 個を、ローマ字の全候補に展開する */
+function expandRun(seq, length) {
+  let results = [""];
+  for (let i = 0; i < length; i++) {
+    const options = optionsAt(seq, i);
+    const next = [];
+    for (const prefix of results) {
+      for (const option of options) next.push(prefix + option);
+    }
+    results = next.length > 96 ? next.slice(0, 96) : next;
+  }
+  return results;
+}
+
+/** 旧仮名・新仮名のトークン列を突き合わせて、一致部分と相違部分に分ける */
+function diffTokens(oldTokens, newTokens) {
+  const n = oldTokens.length;
+  const m = newTokens.length;
+  const lcs = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      lcs[i][j] =
+        oldTokens[i] === newTokens[j]
+          ? lcs[i + 1][j + 1] + 1
+          : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+  const ops = [];
+  const push = (type, oldStart, oldEnd, newStart, newEnd) => {
+    const last = ops[ops.length - 1];
+    if (last && last.type === type && type === "replace") {
+      last.oldEnd = oldEnd;
+      last.newEnd = newEnd;
+    } else {
+      ops.push({ type, oldStart, oldEnd, newStart, newEnd });
+    }
+  };
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (oldTokens[i] === newTokens[j]) {
+      push("equal", i, i + 1, j, j + 1);
+      i++;
+      j++;
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+      push("replace", i, i + 1, j, j);
+      i++;
+    } else {
+      push("replace", i, i, j, j + 1);
+      j++;
+    }
+  }
+  if (i < n || j < m) push("replace", i, n, j, m);
+
+  // 片側が空の相違部分は、隣の一致部分を巻き込んで両側を埋める
+  for (let k = 0; k < ops.length; k++) {
+    const op = ops[k];
+    if (op.type !== "replace") continue;
+    if (op.oldEnd > op.oldStart && op.newEnd > op.newStart) continue;
+    const prev = ops[k - 1];
+    const nextOp = ops[k + 1];
+    if (prev && prev.type === "equal") {
+      op.oldStart = prev.oldStart;
+      op.newStart = prev.newStart;
+      ops.splice(k - 1, 1);
+      k--;
+    } else if (nextOp && nextOp.type === "equal") {
+      op.oldEnd = nextOp.oldEnd;
+      op.newEnd = nextOp.newEnd;
+      ops.splice(k + 1, 1);
+    } else {
+      // 埋めようがない場合は一致部分として扱う（全体が空のときだけ）
+      op.type = "equal";
+    }
+  }
+  return ops;
+}
+
+/**
+ * チャンクごとの入力候補を組み立てる。
+ * modernKana を渡すと、旧仮名・新仮名のどちらの表記でも打てるようになる。
+ */
+export function buildChunks(kana, modernKana) {
+  const tokens = tokenize(kana);
+  if (!modernKana) {
+    return tokens.map((token, i) => ({ kana: token, options: optionsAt(tokens, i) }));
+  }
+
+  const modernTokens = tokenize(modernKana);
+  const chunks = [];
+  for (const op of diffTokens(tokens, modernTokens)) {
+    if (op.type === "equal") {
+      for (let i = op.oldStart; i < op.oldEnd; i++) {
+        chunks.push({ kana: tokens[i], options: optionsAt(tokens, i) });
+      }
+      continue;
+    }
+    // 表記が違う部分は一塊にして、旧仮名の候補と新仮名の候補を両方受け付ける
+    const oldRun = tokens.slice(op.oldStart, op.oldEnd);
+    const newRun = modernTokens.slice(op.newStart, op.newEnd);
+    const tail = tokens.slice(op.oldEnd);
+    const options = [
+      ...expandRun([...oldRun, ...tail], oldRun.length),
+      ...expandRun([...newRun, ...tail], newRun.length),
+    ];
+    chunks.push({ kana: oldRun.join(""), options: [...new Set(options)] });
+  }
+  return chunks;
 }
 
 function optionsOf(token, next) {
@@ -100,11 +204,12 @@ function optionsOf(token, next) {
 /**
  * 1首分のタイピング判定。
  * 生きている状態（チャンク位置・候補・候補内オフセット）の集合を保持する。
+ * modernKana を渡すと、旧仮名・新仮名のどちらの表記でも打てる。
  */
 export class TypingTarget {
-  constructor(kana) {
+  constructor(kana, modernKana) {
     this.kana = kana;
-    this.chunks = buildChunks(kana);
+    this.chunks = buildChunks(kana, modernKana);
     this.typed = "";
     this.missCount = 0;
     this.states = this.chunks.length ? [{ ci: 0, oi: 0, pos: 0 }] : [];
@@ -162,7 +267,11 @@ export class TypingTarget {
     return this.chunks.slice(0, minCi).reduce((n, c) => n + c.kana.length, 0);
   }
 
-  /** 表示用のローマ字全体（確定済み + これから打つ分） */
+  /**
+   * 表示用のローマ字全体（確定済み + これから打つ分）。
+   * 打ち方が複数あるときは、その歌の表記どおりの候補（各チャンクの第一候補）を優先する。
+   * 途中で表示が入れ替わらないよう、候補の短さより優先順位を先に見る。
+   */
   hint() {
     if (this.done) return this.typed;
     let best = null;
@@ -174,9 +283,13 @@ export class TypingTarget {
           .slice(s.ci + 1)
           .map((c) => c.options[0])
           .join("");
-      if (best === null || rest.length < best.length) best = rest;
+      const better =
+        best === null ||
+        s.oi < best.oi ||
+        (s.oi === best.oi && rest.length < best.rest.length);
+      if (better) best = { oi: s.oi, rest };
     }
-    return this.typed + (best ?? "");
+    return this.typed + (best ? best.rest : "");
   }
 
   /** 標準的なローマ字表記（最短候補） */
