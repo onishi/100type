@@ -55,6 +55,14 @@ test/               ローマ字エンジンのテスト
 ## デプロイ
 
 `.github/workflows/deploy.yml` が push のたびに GitHub Pages へ公開します（ビルド工程なし）。
+テストが通った場合のみ公開されます。
+
+**初回のみ、リポジトリ側で Pages を有効化する必要があります。**
+Settings → Pages → Build and deployment → Source を **GitHub Actions** にしてください。
+（Actions の `GITHUB_TOKEN` では Pages サイトの新規作成ができないため、この操作だけは手動です）
+
+有効化後は Actions タブから `Deploy to GitHub Pages` を再実行すれば公開されます。
+公開 URL は `https://onishi.github.io/100type/` です。
 
 ## ライセンス
 
