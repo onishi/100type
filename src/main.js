@@ -5,7 +5,7 @@ const $ = (id) => document.getElementById(id);
 const SETTINGS_KEY = "100type.settings";
 const BEST_KEY = "100type.best";
 
-const DEFAULTS = { count: 10, order: "random", level: "easy" };
+const DEFAULTS = { count: 10, order: "random", level: "easy", wait: 2000 };
 const RANKS = [
   [300, "歌聖"],
   [220, "歌仙"],
@@ -35,6 +35,8 @@ const el = {
   hudMiss: $("hud-miss"),
   progressFill: $("progress-fill"),
   imeWarn: $("ime-warn"),
+  reading: $("reading"),
+  readingFill: $("reading-fill"),
   capture: $("capture"),
   bestRecord: $("best-record"),
 };
@@ -46,6 +48,7 @@ const settings = loadSettings();
  *          poemMiss:number, finished:boolean}} */
 let game = null;
 let tick = null;
+let revealTimer = null;
 
 /* ── 設定 ─────────────────────────────────── */
 function loadSettings() {
@@ -77,7 +80,7 @@ function bindChoices(containerId, key, onChange) {
     const btn = e.target.closest(".choice");
     if (!btn) return;
     const raw = btn.dataset.value;
-    settings[key] = key === "count" ? Number(raw) : raw;
+    settings[key] = key === "count" || key === "wait" ? Number(raw) : raw;
     saveSettings();
     paint();
     onChange?.();
@@ -149,6 +152,7 @@ function startGame() {
     log: [],
     poemStartedAt: 0,
     poemMiss: 0,
+    phase: "reading",
     finished: false,
   };
   el.imeWarn.hidden = true;
@@ -174,6 +178,8 @@ function loadPoem() {
   game.target = new TypingTarget(poem.shimoKana);
   game.poemStartedAt = performance.now();
   game.poemMiss = 0;
+  // 上の句だけを見せる「詠み上げ」の間。打ち始めは待たずにできる。
+  game.phase = settings.wait > 0 ? "reading" : "typing";
 
   el.poemNo.textContent = `第${poem.n}番`;
   el.author.textContent = poem.author;
@@ -181,8 +187,33 @@ function loadPoem() {
   setPhrases(el.kamiKana, poem.kamiKana);
   el.kamiKana.hidden = settings.level === "hard";
   setPhrases(el.shimoKanji, poem.shimo);
-  el.shimoKanji.hidden = settings.level !== "hard";
   el.card.classList.remove("clear");
+  startReading();
+  renderTarget();
+}
+
+/** 下の句を伏せたまま、待ち時間のあいだ詠み上げ表示を出す */
+function startReading() {
+  clearTimeout(revealTimer);
+  if (game.phase !== "reading") {
+    el.reading.classList.add("invisible");
+    return;
+  }
+  el.reading.classList.remove("invisible");
+  const fill = el.readingFill;
+  fill.style.transition = "none";
+  fill.style.width = "0%";
+  void fill.offsetWidth; // リフローさせてからアニメーションを開始する
+  fill.style.transition = `width ${settings.wait}ms linear`;
+  fill.style.width = "100%";
+  revealTimer = setTimeout(reveal, settings.wait);
+}
+
+function reveal() {
+  clearTimeout(revealTimer);
+  if (!game || game.phase !== "reading") return;
+  game.phase = "typing";
+  el.reading.classList.add("invisible");
   renderTarget();
 }
 
@@ -201,9 +232,12 @@ function renderTarget() {
   const poem = game.poems[game.index];
   const target = game.target;
   const confirmed = target.confirmedKanaLength();
+  const reading = game.phase === "reading";
+
+  el.shimoKanji.hidden = settings.level !== "hard" || reading;
 
   // かな表示（上級では下の句を漢字のみで示すため非表示）
-  if (settings.level === "hard") {
+  if (settings.level === "hard" && !reading) {
     el.shimoKana.hidden = true;
   } else {
     el.shimoKana.hidden = false;
@@ -214,21 +248,30 @@ function renderTarget() {
       group.className = "phrase";
       for (const ch of phrase) {
         const span = document.createElement("span");
+        // 詠み上げ中は、すでに打ったぶんだけを表示する
+        if (reading && idx >= confirmed) {
+          idx++;
+          continue;
+        }
         span.textContent = ch;
         span.className = idx < confirmed ? "done" : idx === confirmed ? "cursor" : "todo";
         idx++;
         group.append(span);
       }
-      el.shimoKana.append(group);
+      if (group.childNodes.length) el.shimoKana.append(group);
     }
   }
 
-  // ローマ字表示（初級のみ）
+  // ローマ字表示（初級のみ・詠み上げ中は伏せる）
   if (settings.level !== "easy") {
     el.romaji.hidden = true;
     return;
   }
   el.romaji.hidden = false;
+  if (reading) {
+    el.romaji.replaceChildren();
+    return;
+  }
   const hint = target.hint();
   const typed = target.typed;
   el.romaji.replaceChildren();
@@ -308,6 +351,8 @@ function updateHud() {
 
 function finishGame() {
   game.finished = true;
+  clearTimeout(revealTimer);
+  el.reading.hidden = true;
   game.endedAt = performance.now();
   clearInterval(tick);
   updateHud();
@@ -350,6 +395,7 @@ function finishGame() {
 
 function quitGame() {
   clearInterval(tick);
+  clearTimeout(revealTimer);
   game = null;
   show("start");
   renderBest();
@@ -370,6 +416,13 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   if (!playing || !game || game.finished) return;
+
+  // 詠み上げを待たずに下の句を出す
+  if (game.phase === "reading" && (e.key === " " || e.key === "Spacebar")) {
+    e.preventDefault();
+    reveal();
+    return;
+  }
 
   if (e.isComposing || e.keyCode === 229) {
     el.imeWarn.hidden = false;
@@ -395,6 +448,7 @@ el.screens.play.addEventListener("click", focusCapture);
 /* ── 起動 ─────────────────────────────────── */
 bindChoices("choice-count", "count", renderBest);
 bindChoices("choice-order", "order", renderBest);
+bindChoices("choice-wait", "wait", renderBest);
 bindChoices("choice-level", "level", renderBest);
 $("btn-start").addEventListener("click", startGame);
 $("btn-again").addEventListener("click", startGame);

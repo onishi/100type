@@ -44,6 +44,15 @@
         </div>
       </div>
       <div class="setting">
+        <span class="setting-label">詠み待ち</span>
+        <div class="choices" id="choice-wait" role="radiogroup" aria-label="下の句が表示されるまでの待ち時間">
+          <button class="choice" data-value="0" role="radio">なし</button>
+          <button class="choice" data-value="2000" role="radio">2秒</button>
+          <button class="choice" data-value="4000" role="radio">4秒</button>
+          <button class="choice" data-value="8000" role="radio">8秒</button>
+        </div>
+      </div>
+      <div class="setting">
         <span class="setting-label">難易度</span>
         <div class="choices" id="choice-level" role="radiogroup" aria-label="難易度">
           <button class="choice" data-value="easy" role="radio">初級<small>かな＋ローマ字</small></button>
@@ -55,7 +64,7 @@
 
     <button id="btn-start" class="primary">はじめる<kbd>Enter</kbd></button>
     <p id="best-record" class="best"></p>
-    <p class="note">日本語入力は<strong>オフ（直接入力）</strong>にしてください。<br>「し」は <code>shi</code> / <code>si</code>、「ん」は <code>n</code> / <code>nn</code> など複数のローマ字入力に対応しています。</p>
+    <p class="note">上の句が出たあと、少し置いてから下の句が表示されます（<code>Space</code> ですぐ表示）。<br>日本語入力は<strong>オフ（直接入力）</strong>にしてください。<br>「し」は <code>shi</code> / <code>si</code>、「ん」は <code>n</code> / <code>nn</code> など複数のローマ字入力に対応しています。</p>
   </section>
 
   <!-- ▼ プレイ画面 -->
@@ -74,9 +83,16 @@
       <p class="kami" id="kami">秋の田の かりほの庵の 苫をあらみ</p>
       <p class="kami-kana" id="kami-kana">あきのたの かりほのいほの とまをあらみ</p>
       <hr class="rule">
-      <p class="shimo-kanji" id="shimo-kanji" hidden>わが衣手は 露にぬれつつ</p>
-      <p class="shimo-kana" id="shimo-kana"></p>
-      <p class="romaji" id="romaji"></p>
+      <div class="shimo-area">
+        <p class="reading invisible" id="reading">
+          <span class="reading-label">詠み上げ中<span class="dots"><i></i><i></i><i></i></span></span>
+          <span class="reading-bar"><i id="reading-fill"></i></span>
+          <span class="reading-note">覚えていれば先に打てます／<kbd>Space</kbd>ですぐ表示</span>
+        </p>
+        <p class="shimo-kanji" id="shimo-kanji" hidden>わが衣手は 露にぬれつつ</p>
+        <p class="shimo-kana" id="shimo-kana"></p>
+        <p class="romaji" id="romaji"></p>
+      </div>
     </article>
 
     <p class="hint-bar">
