@@ -107,6 +107,7 @@ export function speak(text, { onPhrase, onEnd } = {}) {
   const alive = () => seq === speechSeq;
   try {
     synth.cancel();
+    synth.resume?.(); // 一時停止のまま固まっている環境への保険
   } catch {
     return false;
   }
@@ -145,7 +146,8 @@ export function speak(text, { onPhrase, onEnd } = {}) {
     }
   };
 
-  speakPhrase(0);
+  // cancel() の直後に speak() すると鳴らないブラウザがあるので、少し置いてから始める
+  setTimeout(() => speakPhrase(0), 120);
   return true;
 }
 

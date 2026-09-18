@@ -53,7 +53,6 @@ const settings = loadSettings();
 let game = null;
 let tick = null;
 let revealTimer = null;
-let safetyTimer = null;
 
 /* ── 設定 ─────────────────────────────────── */
 function loadSettings() {
@@ -195,8 +194,6 @@ function startGame() {
     poemStartedAt: 0,
     poemMiss: 0,
     phase: "reading",
-    waitDone: false,
-    speechDone: true,
     finished: false,
   };
   el.imeWarn.hidden = true;
@@ -224,8 +221,6 @@ function loadPoem() {
   game.poemMiss = 0;
   // 上の句だけを見せる「詠み上げ」の間。打ち始めは待たずにできる。
   game.phase = settings.wait > 0 ? "reading" : "typing";
-  game.waitDone = settings.wait <= 0;
-  game.speechDone = true;
 
   el.poemNo.textContent = `第${poem.n}番`;
   el.author.textContent = poem.author;
@@ -238,24 +233,23 @@ function loadPoem() {
   renderTarget();
 }
 
-/** 下の句を伏せたまま、上の句を読み上げつつ待ち時間を表示する */
+/**
+ * 上の句を読み上げつつ、詠み待ちのあいだ下の句を伏せておく。
+ * 読み上げと詠み待ちは別々に動く。読み上げは待ち時間の設定によらず必ず流し、
+ * 下の句は設定した待ち時間ちょうどで表示する（読み上げの途中でも待たない）。
+ */
 function startReading() {
   clearTimeout(revealTimer);
-  clearTimeout(safetyTimer);
   audio.stopSpeaking();
 
   const poem = game.poems[game.index];
-  const speaking =
-    settings.voice &&
-    audio.speak(poem.kamiSpeech, { onPhrase: highlightPhrase, onEnd: onSpeechEnd });
-  game.speechDone = !speaking;
-  game.waitDone = settings.wait <= 0;
+  const speaking = settings.voice && audio.speak(poem.kamiSpeech, { onPhrase: highlightPhrase });
   el.readingLabel.firstChild.textContent = speaking ? "詠み上げ中" : "まもなく下の句";
   if (!speaking) highlightPhrase(-1);
 
   if (game.phase !== "reading") {
     el.reading.classList.add("invisible");
-    // 「詠み待ちなし」でも読み上げは最後まで流す
+    // 「詠み待ちなし」でも読み上げはそのまま流す
     return;
   }
   el.reading.classList.remove("invisible");
@@ -265,12 +259,7 @@ function startReading() {
   void fill.offsetWidth; // リフローさせてからアニメーションを開始する
   fill.style.transition = `width ${settings.wait}ms linear`;
   fill.style.width = "100%";
-  revealTimer = setTimeout(() => {
-    game.waitDone = true;
-    maybeReveal();
-  }, settings.wait);
-  // 読み上げ終了イベントが来ない場合でも必ず表示する
-  safetyTimer = setTimeout(reveal, settings.wait + 15000);
+  revealTimer = setTimeout(reveal, settings.wait);
 }
 
 /** 読み上げ中の句を光らせる（-1 で消す） */
@@ -281,19 +270,8 @@ function highlightPhrase(index) {
   kana.forEach((node, i) => node.classList.toggle("speaking", i === index));
 }
 
-function onSpeechEnd() {
-  if (!game) return;
-  game.speechDone = true;
-  maybeReveal();
-}
-
-function maybeReveal() {
-  if (game && game.waitDone && game.speechDone) reveal();
-}
-
 function reveal() {
   clearTimeout(revealTimer);
-  clearTimeout(safetyTimer);
   if (!game || game.phase !== "reading") return;
   game.phase = "typing";
   el.reading.classList.add("invisible");
@@ -441,8 +419,7 @@ function finishGame() {
   highlightPhrase(-1);
   if (settings.se) audio.sfx.finish();
   clearTimeout(revealTimer);
-  clearTimeout(safetyTimer);
-  el.reading.hidden = true;
+  el.reading.classList.add("invisible");
   game.endedAt = performance.now();
   clearInterval(tick);
   updateHud();
@@ -486,7 +463,6 @@ function finishGame() {
 function quitGame() {
   clearInterval(tick);
   clearTimeout(revealTimer);
-  clearTimeout(safetyTimer);
   audio.stopSpeaking();
   highlightPhrase(-1);
   game = null;
