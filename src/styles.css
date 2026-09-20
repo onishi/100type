@@ -32,6 +32,9 @@
 
 * { box-sizing: border-box; }
 
+/* display を指定した要素でも hidden が効くようにしておく */
+[hidden] { display: none !important; }
+
 html, body { height: 100%; }
 
 body {
@@ -233,6 +236,8 @@ kbd {
 }
 
 .note code { font-family: var(--mono); font-size: 0.95em; }
+
+.note-line { display: block; }
 
 /* ── HUD ──────────────────────────────────── */
 .hud {
@@ -490,6 +495,7 @@ kbd {
 
 @media (hover: none) and (pointer: coarse) {
   .touch-only { display: inline-flex; }
+  kbd { display: none; } /* 物理キーボードがない端末では案内しない */
 }
 
 /* ── 結果 ─────────────────────────────────── */
@@ -540,7 +546,24 @@ kbd {
 .footer a { color: inherit; }
 
 @media (max-width: 560px) {
-  .setting { grid-template-columns: 1fr; gap: 6px; }
+  /* タイトル画面を一画面に収める */
+  .title-block { margin-bottom: 14px; }
+  .kicker { font-size: 0.7rem; letter-spacing: 0.35em; text-indent: 0.35em; }
+  .title { font-size: clamp(1.9rem, 9vw, 2.5rem); }
+  .title-sub { font-size: 0.32em; margin-top: 0.45em; }
+  .lead { display: none; }
+  .settings { padding: 12px 12px 14px; gap: 9px; border-radius: 12px; }
+  .setting { grid-template-columns: 4.4em 1fr; gap: 8px; align-items: center; }
+  .setting-label { font-size: 0.76rem; letter-spacing: 0.06em; }
+  .choices { gap: 6px; }
+  .choice { padding: 6px 12px; font-size: 0.85rem; }
+  .choice small { display: none; }
+  .wide-setting { display: none; } /* 現代語訳は画面が広いときだけの設定 */
+  .primary { margin-top: 16px; padding: 12px 20px; font-size: 1rem; }
+  .best { font-size: 0.85rem; margin-top: 10px; }
+  .note { margin-top: 14px; font-size: 0.8rem; line-height: 1.7; }
+  .note-detail { display: none; }
+
   .hud-item { min-width: 3.6em; }
   .hud-value { font-size: 1.05rem; }
   #app { padding: 14px 14px 16px; }
@@ -551,7 +574,6 @@ kbd {
   .reading-note { display: none; }
   .rule { margin: 12px 0; }
   .ghost { padding: 7px 13px; font-size: 0.82rem; }
-  .ghost kbd { display: none; }
   .wide-only { display: none; }
   .primary { padding: 13px 20px; font-size: 1.05rem; }
 }
@@ -562,7 +584,7 @@ kbd {
  */
 body.compact #app { padding: 8px 12px 10px; }
 
-body.compact #screen-play {
+body.compact #screen-play:not([hidden]) {
   display: flex;
   flex-direction: column;
   max-height: calc(var(--app-height, 100svh) - 18px);
