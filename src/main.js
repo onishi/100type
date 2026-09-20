@@ -701,6 +701,22 @@ $("btn-mute").addEventListener("click", () => {
   }
   focusCapture();
 });
+/**
+ * ソフトキーボードが出ると見える範囲が狭くなる。
+ * その高さを CSS に渡し、狭いときは表示を詰める（compact）。
+ */
+function updateViewport() {
+  const view = window.visualViewport;
+  const height = Math.round(view ? view.height : window.innerHeight);
+  document.documentElement.style.setProperty("--app-height", `${height}px`);
+  document.body.classList.toggle("compact", height < 700);
+}
+
+updateViewport();
+window.addEventListener("resize", updateViewport);
+window.visualViewport?.addEventListener("resize", updateViewport);
+window.visualViewport?.addEventListener("scroll", updateViewport);
+
 renderBest();
 renderVoiceSetting();
 updateVoiceNotice();
