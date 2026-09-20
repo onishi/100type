@@ -383,31 +383,36 @@ function renderTarget() {
   const reading = game.phase === "reading";
 
   el.shimoKanji.hidden = settings.level !== "hard" || reading;
+  // 詠み上げを待つあいだと上級では、まだ打っていない部分を伏せる。
+  // 打ったぶんは出すので、どこまで進んだかは分かる。
+  const masked = reading || settings.level === "hard";
 
-  // かな表示（上級では下の句を漢字のみで示すため非表示）
-  if (settings.level === "hard" && !reading) {
-    el.shimoKana.hidden = true;
-  } else {
-    el.shimoKana.hidden = false;
-    el.shimoKana.replaceChildren();
-    let idx = 0;
-    for (const phrase of poem.shimoKana.split(/\s+/).filter(Boolean)) {
-      const group = document.createElement("span");
-      group.className = "phrase";
-      for (const ch of phrase) {
-        const span = document.createElement("span");
-        // 詠み上げ中は、すでに打ったぶんだけを表示する
-        if (reading && idx >= confirmed) {
-          idx++;
-          continue;
-        }
-        span.textContent = ch;
-        span.className = idx < confirmed ? "done" : idx === confirmed ? "cursor" : "todo";
+  el.shimoKana.hidden = false;
+  el.shimoKana.classList.toggle("masked", masked);
+  el.shimoKana.replaceChildren();
+  let idx = 0;
+  for (const phrase of poem.shimoKana.split(/\s+/).filter(Boolean)) {
+    const group = document.createElement("span");
+    group.className = "phrase";
+    for (const ch of phrase) {
+      if (masked && idx >= confirmed) {
         idx++;
-        group.append(span);
+        continue;
       }
-      if (group.childNodes.length) el.shimoKana.append(group);
+      const span = document.createElement("span");
+      span.textContent = ch;
+      span.className = idx < confirmed ? "done" : idx === confirmed ? "cursor" : "todo";
+      idx++;
+      group.append(span);
     }
+    if (group.childNodes.length) el.shimoKana.append(group);
+  }
+  // 伏せているときは、次に打つ位置に印を出す
+  if (masked && !target.done) {
+    const caret = document.createElement("span");
+    caret.className = "caret";
+    caret.setAttribute("aria-hidden", "true");
+    (el.shimoKana.lastElementChild ?? el.shimoKana).append(caret);
   }
 
   // ローマ字表示（初級のみ・詠み上げ中は伏せる）
