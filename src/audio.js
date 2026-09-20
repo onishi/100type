@@ -98,6 +98,13 @@ const PHRASE_GAP_MS = 420; // 句のあいだに置く間
 const VERSE_GAP_MS = 700; // 上の句と下の句のあいだに置く間
 export const DEFAULT_RATE = 0.8;
 const FINAL_PHRASE_RATE = 0.9; // 結びの句は少しゆっくり読む
+// 句の終わりを伸ばす（「ありまやまー いなのささはらー かぜふけばー」）。
+// 「ん」「っ」で終わる句は伸ばさない。
+const LONG_VOWEL = "ー";
+
+function lengthen(phrase) {
+  return /[んっーぁぃぅぇぉ]$/.test(phrase) ? phrase : phrase + LONG_VOWEL;
+}
 let speechSeq = 0;
 let chainActive = false; // いま読み上げの途中かどうか
 let queued = null; // 読み終わったあとに続けて読むもの
@@ -168,9 +175,10 @@ function startChain(text, { onPhrase, onEnd, rate = DEFAULT_RATE } = {}, delay =
     };
     const last = i === phrases.length - 1;
     const phraseRate = last ? rate * FINAL_PHRASE_RATE : rate;
-    const guard = setTimeout(advance, estimateMs(phrases[i], phraseRate));
+    const spoken = lengthen(phrases[i]);
+    const guard = setTimeout(advance, estimateMs(spoken, phraseRate));
     try {
-      const utterance = new SpeechSynthesisUtterance(phrases[i]);
+      const utterance = new SpeechSynthesisUtterance(spoken);
       utterance.lang = voice.lang || "ja-JP";
       try {
         utterance.voice = voice;
