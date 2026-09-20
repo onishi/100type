@@ -437,6 +437,20 @@ function renderTarget() {
   el.romaji.append(next, document.createTextNode(hint.slice(target.typed.length + 1)));
 }
 
+/** Space 相当の操作：詠み上げを飛ばす／次の歌へ進む */
+function skipAhead() {
+  if (pendingAdvance) {
+    audio.stopSpeaking();
+    pendingAdvance();
+    return true;
+  }
+  if (game && !game.finished && game.phase === "reading") {
+    reveal();
+    return true;
+  }
+  return false;
+}
+
 function handleKey(ch) {
   if (!game || game.finished || game.target.done) return; // 次の歌へ移る間の打鍵は無視する
   if (game.startedAt === null) {
@@ -598,29 +612,19 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     if (!el.screens.start.hidden) startGame();
     else if (!el.screens.result.hidden) startGame();
+    else if (playing && skipAhead()) e.preventDefault();
     return;
   }
   if (!playing || !game || game.finished) return;
 
-  // 下の句を詠み上げている間に Space / Enter を押したら次の歌へ
-  if (pendingAdvance && (e.key === " " || e.key === "Spacebar" || e.key === "Enter")) {
-    e.preventDefault();
-    audio.stopSpeaking();
-    pendingAdvance();
+  if (e.key === " " || e.key === "Spacebar") {
+    if (skipAhead()) e.preventDefault();
     return;
   }
 
-  // 詠み上げを待たずに下の句を出す
-  if (game.phase === "reading" && (e.key === " " || e.key === "Spacebar")) {
-    e.preventDefault();
-    reveal();
-    return;
-  }
-
-  if (e.isComposing || e.keyCode === 229) {
-    el.imeWarn.hidden = false;
-    return;
-  }
+  // ソフトキーボードは keydown で文字が取れない（229 や Unidentified になる）。
+  // その場合は下の input で拾うので、ここでは何もしない。
+  if (e.isComposing || e.keyCode === 229 || e.key === "Unidentified") return;
   if (e.key.length !== 1) return;
   if (!/^[a-zA-Z0-9,.\-']$/.test(e.key)) return;
   e.preventDefault();
@@ -628,15 +632,42 @@ document.addEventListener("keydown", (e) => {
   handleKey(e.key);
 });
 
-// 変換候補が確定された場合（IME オン）にも気づけるようにする
-el.capture.addEventListener("input", () => {
-  if (el.capture.value !== "") {
+/**
+ * ソフトキーボードからの入力を拾う。
+ * 物理キーボードで打った文字は keydown 側で preventDefault しているので
+ * ここには流れてこない。日本語が入ってきたら入力方式の案内を出す。
+ */
+el.capture.addEventListener("input", (e) => {
+  const value = el.capture.value;
+  if (e.isComposing) {
     el.imeWarn.hidden = false;
-    el.capture.value = "";
+    return;
   }
+  el.capture.value = "";
+  if (!value) return;
+  if (el.screens.play.hidden || !game || game.finished) return;
+
+  let unsupported = false;
+  for (const ch of value) {
+    if (ch === " ") skipAhead();
+    else if (/^[a-zA-Z0-9,.\-']$/.test(ch)) handleKey(ch);
+    else if (ch !== "\n") unsupported = true;
+  }
+  el.imeWarn.hidden = !unsupported;
 });
 
-el.screens.play.addEventListener("click", focusCapture);
+el.capture.addEventListener("compositionend", () => {
+  // 変換された文字は受け取らずに捨てる（ローマ字入力に戻してもらう）
+  el.capture.value = "";
+  el.imeWarn.hidden = false;
+});
+
+// 画面のどこかを触ったら入力欄に焦点を戻す（スマートフォンでキーボードが引っ込んだとき用）。
+// 既定の動作で焦点が外れたあとに当て直したいので click を使う。
+el.screens.play.addEventListener("click", (e) => {
+  if (e.target.closest("button, a, input")) return; // ボタン操作の邪魔をしない
+  focusCapture();
+});
 
 /* ── 起動 ─────────────────────────────────── */
 bindChoices("choice-count", "count", renderBest);
@@ -651,6 +682,10 @@ $("btn-start").addEventListener("click", startGame);
 $("btn-again").addEventListener("click", startGame);
 $("btn-home").addEventListener("click", quitGame);
 $("btn-quit").addEventListener("click", quitGame);
+$("btn-keyboard").addEventListener("click", (e) => {
+  e.preventDefault();
+  focusCapture();
+});
 $("btn-mute").addEventListener("click", () => {
   const on = settings.voice || settings.se;
   settings.voice = settings.se = !on;

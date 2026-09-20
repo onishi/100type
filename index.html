@@ -128,10 +128,13 @@
     <p class="hint-bar">
       <button id="btn-quit" class="ghost">やめる<kbd>Esc</kbd></button>
       <button id="btn-mute" class="ghost" aria-pressed="false">音を止める</button>
-      <span class="ime-warn" id="ime-warn" hidden>日本語入力がオンになっていませんか？</span>
+      <button id="btn-keyboard" class="ghost touch-only">キーボードを出す</button>
+      <span class="ime-warn" id="ime-warn" hidden>英字（ローマ字）入力に切り替えてください</span>
     </p>
     <p class="translation" id="translation"></p>
-    <input id="capture" class="capture" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-hidden="true" tabindex="-1">
+    <input id="capture" class="capture" type="text" inputmode="text" lang="en"
+           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+           enterkeyhint="next" aria-label="下の句をローマ字で入力">
   </section>
 
   <!-- ▼ 結果画面 -->

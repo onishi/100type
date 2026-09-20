@@ -458,14 +458,38 @@ kbd {
   .translation.on { display: block; }
 }
 
+/*
+ * 入力を受ける欄。スマートフォンではここに焦点が当たるとソフトキーボードが開く。
+ * 画面には出さないが、iOS は display:none や opacity:0 の欄に焦点を当てられないので、
+ * 画面下に薄く置いて触れるようにしておく（文字は見えない）。
+ */
 .capture {
   position: fixed;
-  opacity: 0;
-  pointer-events: none;
-  width: 1px;
-  height: 1px;
-  bottom: 0;
   left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2.8em;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  font-size: 16px; /* これより小さいと iOS が拡大してしまう */
+  opacity: 0.01;
+  z-index: 3;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.capture:focus { outline: none; }
+
+/* 触って操作する端末にだけ出すもの */
+.touch-only { display: none; }
+
+@media (hover: none) and (pointer: coarse) {
+  .touch-only { display: inline-flex; }
 }
 
 /* ── 結果 ─────────────────────────────────── */
