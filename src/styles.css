@@ -426,6 +426,9 @@ kbd {
 }
 
 .romaji .done { color: var(--ink-faint); text-decoration: line-through; text-decoration-color: var(--line); }
+
+/* 先の分を出さないモードでは、打った跡だけを素直に見せる */
+.romaji .typed { color: var(--ink-soft); }
 .romaji .next { color: var(--crimson); font-weight: 700; }
 
 .hint-bar {
@@ -439,6 +442,21 @@ kbd {
 }
 
 .ime-warn { color: var(--crimson); font-size: 0.88rem; margin-inline-start: auto; }
+
+/* 現代語訳は画面が広いときだけ、歌札の下に置く */
+.translation {
+  display: none;
+  margin: 18px 4px 0;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.9;
+}
+
+@media (min-width: 760px) {
+  .translation.on { display: block; }
+}
 
 .capture {
   position: fixed;

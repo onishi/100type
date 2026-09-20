@@ -105,6 +105,17 @@ const LONG_VOWEL = "ー";
 function lengthen(phrase) {
   return /[んっーぁぃぅぇぉ]$/.test(phrase) ? phrase : phrase + LONG_VOWEL;
 }
+
+/**
+ * ひらがなをカタカナに直してから読ませる。
+ * ひらがなのままだと音声合成が助詞の「は」を探してしまい、
+ * 「わたのはら」を〈わたの・は・ら〉と読んで「わたのわら」、
+ * 「はなさそう」を「わなさそう」と読むことがある。
+ * 読みはこちらで発音どおりに直してあるので、文法の解釈は要らない。
+ */
+function toKatakana(text) {
+  return text.replace(/[ぁ-ゖ]/gu, (ch) => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+}
 let speechSeq = 0;
 let chainActive = false; // いま読み上げの途中かどうか
 let queued = null; // 読み終わったあとに続けて読むもの
@@ -175,7 +186,7 @@ function startChain(text, { onPhrase, onEnd, rate = DEFAULT_RATE } = {}, delay =
     };
     const last = i === phrases.length - 1;
     const phraseRate = last ? rate * FINAL_PHRASE_RATE : rate;
-    const spoken = lengthen(phrases[i]);
+    const spoken = toKatakana(lengthen(phrases[i]));
     const guard = setTimeout(advance, estimateMs(spoken, phraseRate));
     try {
       const utterance = new SpeechSynthesisUtterance(spoken);

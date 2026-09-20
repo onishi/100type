@@ -72,6 +72,12 @@
         </div>
       </div>
       <div class="setting">
+        <span class="setting-label">現代語訳</span>
+        <div class="choices" id="choice-extra">
+          <button class="choice" data-key="translation" role="switch">歌の下に出す<small>画面が広いとき</small></button>
+        </div>
+      </div>
+      <div class="setting">
         <span class="setting-label">難易度</span>
         <div class="choices" id="choice-level" role="radiogroup" aria-label="難易度">
           <button class="choice" data-value="easy" role="radio">初級<small>かな＋ローマ字</small></button>
@@ -124,6 +130,7 @@
       <button id="btn-mute" class="ghost" aria-pressed="false">音を止める</button>
       <span class="ime-warn" id="ime-warn" hidden>日本語入力がオンになっていませんか？</span>
     </p>
+    <p class="translation" id="translation"></p>
     <input id="capture" class="capture" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-hidden="true" tabindex="-1">
   </section>
 

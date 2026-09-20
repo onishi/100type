@@ -223,3 +223,10 @@ test("読みのデータが壊れていない", () => {
   assert.equal(n93.kamiKana.split(/\s+/)[0], "よのなかは");
   assert.equal(n93.kamiSpeech.split(/\s+/)[0], "よのなかわ");
 });
+
+test("現代語訳が全首そろっている", () => {
+  for (const p of POEMS) {
+    assert.ok(p.modern && p.modern.length >= 15, `${p.n}: 現代語訳がない`);
+    assert.match(p.modern, /^[ぁ-んァ-ヶ一-龥々ー、。「」（）…]+$/u, `${p.n}: 妙な文字が混ざっている`);
+  }
+});

@@ -16,6 +16,7 @@ const DEFAULTS = {
   readShimo: true,
   se: true,
   rate: 0.8,
+  translation: true,
 };
 const RANKS = [
   [300, "歌聖"],
@@ -52,6 +53,7 @@ const el = {
   readingNote: $("reading-note"),
   voiceNotice: $("voice-notice"),
   voiceSetting: $("voice-setting"),
+  translation: $("translation"),
   mute: $("btn-mute"),
   readingFill: $("reading-fill"),
   capture: $("capture"),
@@ -263,6 +265,8 @@ function loadPoem() {
   setKamiKana(poem);
   el.kamiKana.hidden = settings.level === "hard";
   el.kimariji.textContent = kimarijiLabel(poem);
+  el.translation.textContent = poem.modern;
+  el.translation.classList.toggle("on", settings.translation);
   setPhrases(el.shimoKanji, poem.shimo);
   el.card.classList.remove("clear");
   startReading();
@@ -415,27 +419,22 @@ function renderTarget() {
     (el.shimoKana.lastElementChild ?? el.shimoKana).append(caret);
   }
 
-  // ローマ字表示（初級のみ・詠み上げ中は伏せる）
-  if (settings.level !== "easy") {
-    el.romaji.hidden = true;
-    return;
-  }
+  // ローマ字表示。打ち終えたぶんはどのモードでも出し、
+  // これから打つぶんを見せるのは初級だけ（詠み上げ中は伏せる）。
+  const showAhead = settings.level === "easy" && !reading;
   el.romaji.hidden = false;
-  if (reading) {
-    el.romaji.replaceChildren();
-    return;
-  }
-  const hint = target.hint();
-  const typed = target.typed;
   el.romaji.replaceChildren();
-  const done = document.createElement("span");
-  done.className = "done";
-  done.textContent = typed;
+  const typed = document.createElement("span");
+  typed.className = showAhead ? "done" : "typed";
+  typed.textContent = target.typed;
+  el.romaji.append(typed);
+  if (!showAhead) return;
+
+  const hint = target.hint();
   const next = document.createElement("span");
   next.className = "next";
-  next.textContent = hint.slice(typed.length, typed.length + 1);
-  const rest = document.createTextNode(hint.slice(typed.length + 1));
-  el.romaji.append(done, next, rest);
+  next.textContent = hint.slice(target.typed.length, target.typed.length + 1);
+  el.romaji.append(next, document.createTextNode(hint.slice(target.typed.length + 1)));
 }
 
 function handleKey(ch) {
@@ -644,6 +643,7 @@ bindChoices("choice-count", "count", renderBest);
 bindChoices("choice-order", "order", renderBest);
 bindChoices("choice-wait", "wait", renderBest);
 bindToggles("choice-sound");
+bindToggles("choice-extra");
 bindChoices("choice-rate", "rate");
 $("btn-try-voice").addEventListener("click", tryVoice);
 bindChoices("choice-level", "level", renderBest);
