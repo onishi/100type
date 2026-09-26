@@ -150,6 +150,7 @@ src/audio.js        読み上げ（音声合成）と効果音の合成
 src/kimariji.js     決まり字の計算（100 首の読みから求める）
 src/data/poems.js   小倉百人一首 100 首（上の句・下の句・読み・新仮名/発音どおりの表記・読み上げ用の読み・作者）
 test/               ローマ字エンジンのテスト
+worker/index.js     /_monitor/health（監視用）だけを返す Worker。他は静的アセットへ
 wrangler.jsonc      Cloudflare Workers の設定（dist/ を静的配信）
 ```
 
@@ -163,9 +164,10 @@ wrangler.jsonc      Cloudflare Workers の設定（dist/ を静的配信）
 
 Cloudflare Workers（静的アセット）で公開しています。
 
-- 公開 URL: <https://100type.wagaya.workers.dev>
+- 公開 URL: <https://100type.wagaya.org>（独自ドメインのみ。workers.dev は無効）
+- 監視: `/_monitor/health` を [monitor.wagaya.org](https://monitor.wagaya.org) が毎時確認
 - `_headers` で `Cache-Control: no-cache` を指定し、更新がすぐ反映されるようにしています
-- 設定: `wrangler.jsonc`（`dist/` をそのまま配信するだけ。ビルド工程は index.html と src/ の複製のみ）
+- 設定: `wrangler.jsonc`（`dist/` をそのまま配信。ビルド工程は index.html と src/ の複製のみ）
 
 手元から手動で出す場合:
 
